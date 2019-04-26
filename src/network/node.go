@@ -1,13 +1,9 @@
 package network
 
 import (
-	//"../util"
 	"crypto/ecdsa"
-	"fmt"
 	"github.com/agoussia/godes"
-	//"github.com/ethereum/go-ethereum/crypto"
 	"strconv"
-	"time"
 )
 
 type INode interface {
@@ -38,17 +34,11 @@ type Node struct {
 
 	runFunction    RunFunction
 	TotalMessages  int
-	addedAt        time.Time
+	addedAt        float64
 	livenessChecks uint
 }
 
-var TotalMessages = 0
-var nodes = make(map[int]*Node)
-var uniform = godes.NewUniformDistr(true)
 
-func GetNodeById(id int) (*Node) {
-	return nodes[id]
-}
 var nodeCounter = 1
 
 func NewNode(fn RunFunction) (n* Node) {
@@ -56,16 +46,16 @@ func NewNode(fn RunFunction) (n* Node) {
 	n.Runner = &godes.Runner{}
 	n.name = string(strconv.Itoa(nodeCounter))
 //	newUDP(n, nil)
-	n.publicKey = newKey().PublicKey
+	n.publicKey = NewKey().PublicKey
 
-	copy(n.id[:], publicKeyToId(n.publicKey))
+	copy(n.id[:], PublicKeyToId(n.publicKey))
 
 	n.queue = godes.NewFIFOQueue("messages")
 	//n.peers = peers
 	n.runFunction = fn
 	//nodes[id] = n
 
-	fmt.Printf("Added node %s with peers \n", n.name)//%+v
+//	fmt.Printf("Added node %s with peers \n", n.name)//%+v
 
 	nodeCounter += 1
 	return
@@ -83,25 +73,8 @@ func (n *Node) ID() ID {
 	return n.id
 }
 
-/*
-func (n *Node) GetPeers() ([]int) {
-	return n.peers
-}*/
-
-func (n *Node) HasMessage() bool {
-	return n.queue.Len() > 0
-}
-func (n *Node) PopMessage() (m *Message) {
-	TotalMessages++
-	n.TotalMessages++
-	return n.queue.Get().(*Message)
-}
-func (n *Node) AddMessage(m *Message) {
-	n.queue.Place(m)
-}
-
 func (n *Node) Run() {
-	fmt.Println("Running...")
+	//fmt.Println("Running...")
 
 	for {
 		n.runFunction(n)
@@ -109,15 +82,7 @@ func (n *Node) Run() {
 }
 
 
-func (n *Node) Ping(node *Node){
-	msg := NewPingMessage(*n, *node)
-	msg.send()
-}
 
-func (n *Node) Pong(node *Node)  {
-	msg := NewPongMessage(*n, *node)
-	msg.send()
-}
 /*
 
 func (n *Node) FindNode(node *Node, pubkey encPubkey)  {

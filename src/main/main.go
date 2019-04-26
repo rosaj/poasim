@@ -5,6 +5,8 @@ import (
 	"../util"
 	"fmt"
 	"github.com/agoussia/godes"
+	"runtime"
+	sysTime "time"
 )
 
 
@@ -26,13 +28,16 @@ type Transaction struct{
 }
 
 func main(){
-	trAdded.Set(false)
+	runtime.GOMAXPROCS(1)
+
+	start:= sysTime.Now()
+
 	nodes := make([]*network.Node, 3)
 	godes.Run()
-	for i:=0 ; i < 3; i++{
+	for i:=0 ; i < len(nodes); i++{
 		node := network.NewNode(func(node *network.Node) {
 					for{
-						trAdded.WaitAndTimeout(true, 10)
+						util.Wait(10)
 						for _, n := range nodes {
 							if n != node{
 								node.Ping(n)
@@ -45,8 +50,10 @@ func main(){
 	}
 
 
-	util.Wait(60)
+	util.Wait(30)
 	godes.Clear()
+	elapsed := sysTime.Since(start)
+	fmt.Println(elapsed)
 
 	//godes.WaitUntilDone()
 
@@ -81,9 +88,4 @@ func main(){
 	godes.Clear()
 	//godes.WaitUntilDone()
 */
-}
-
-
-func Log(a ...interface{}){
-	fmt.Println(godes.GetSystemTime(), a)
 }

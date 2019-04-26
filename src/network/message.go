@@ -11,50 +11,63 @@ type Message struct {
 	godes.Runner
 	Type string
 	Content interface{}
-	From Node
-	To Node
+	From *Node
+	To *Node
 
 	handler func()
+	onResponse func(m *Message)
+
+	responseTo *Message
 }
 
 func (m *Message) Run()  {
 	util.Log("Send message: ", m)
-	// umjesto advance napravit wait
-	// jer more na vise nodova poslat vise poruka
-	// i onda se samo vrime pomeri napred i zajno salje response
-	// i ako ima prvi veci delaj, svejedno ce se objekt promjenit prije nego od onega koji ima manji delaj
-	// godes.Advance(1)
-	util.Wait(config.SimConfig.NextNodeInterval())
+	godes.Advance(config.SimConfig.NextNetworkLatency())
 	util.Log("Message ", m.Type, " received: ", m.String())
-	m.handler()
+
+	m.handle()
+	m.responded()
 }
 
-func newMessage(from Node, to Node, msgType string, content interface{}) (m *Message){
+
+func newMessage(from *Node, to *Node, msgType string,
+	content interface{}, handler func(), responseTo *Message, onResponse func(m *Message)) (m *Message){
 	m = &Message{}
 	m.Runner = godes.Runner{}
 	m.Type = msgType
 	m.Content = content
 	m.From = from
 	m.To = to
+	m.handler = handler
+	m.onResponse = onResponse
+	m.responseTo = responseTo
 
 	return
 }
 
-func NewPingMessage(from Node, to Node) (m *Message) {
-	m = newMessage(from, to, "PING", "ping")
-	m.handler = func() {
-		m.To.Pong(&m.From)
-	}
+func NewPingMessage(from *Node, to *Node, onResponse func(m *Message)) (m *Message) {
+	m = newMessage(from, to, "PING", "ping",
+		func() {
+		m.To.Pong(m.From, m)
+	}, nil, onResponse)
 	return
 }
 
-func NewPongMessage(from Node, to Node) (m *Message)  {
-	m = newMessage(from, to, "PONG", "pong")
-	m.handler = func() {
-		//m.To.Pong(&m.From)
-		//TODO: what on pong
-	}
+func NewPongMessage(from *Node, to *Node, responseTo *Message) (m *Message)  {
+	m = newMessage(from, to, "PONG", "pong", nil, responseTo, nil)
 	return
+}
+
+func (n *Node) Ping(node *Node){
+	msg := NewPingMessage(n, node, func(m *Message) {
+
+	})
+	msg.send()
+}
+
+func (n *Node) Pong(node *Node, responseToPingMsg *Message)  {
+	msg := NewPongMessage(n, node, responseToPingMsg)
+	msg.send()
 }
 
 /*
@@ -78,6 +91,18 @@ func (m *Message) send(){
 	godes.AddRunner(m)
 }
 
+func (m *Message) handle()  {
+	if m.handler != nil {
+		m.handler()
+	}
+}
+func (m *Message) responded(){
+	if m.responseTo != nil && m.responseTo.onResponse != nil{
+		util.Log("Responded to msg: ", m.responseTo, " with: ", m)
+		m.responseTo.onResponse(m)
+	}
+}
 func (m *Message) String() string {
 	return fmt.Sprintf("[%s] from %s to %s", m.Type, m.From.Name(), m.To.Name())
 }
+

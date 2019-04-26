@@ -1,7 +1,6 @@
 package config
 
 import (
-	"../util"
 	"github.com/agoussia/godes"
 )
 
@@ -43,10 +42,8 @@ func(config *config) NextTrInterval() (interval float64){
 	return
 }
 
-
-func(config *config) NextNodeInterval() (interval float64){
+func (config *config) NextNetworkLatency() (interval float64) {
 	interval = NodePingDistr.Get(1 / config.NodePingTime)
-	util.Log("NodeInterval: ", interval)
 	return
 }
 

@@ -125,7 +125,7 @@ func nodeToRPC(n *node) rpcNode {
 	var key ecdsa.PublicKey
 	var ekey encPubkey
 	if err := n.Load((*enode.Secp256k1)(&key)); err == nil {
-		ekey = encodePubkey(&key)
+		ekey = EncodePubKey(&key)
 	}
 	return rpcNode{ID: ekey, IP: n.IP(), UDP: uint16(n.UDP()), TCP: uint16(n.TCP())}
 }

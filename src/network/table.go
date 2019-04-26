@@ -2,6 +2,7 @@ package network
 
 /*
 import (
+	"../util"
 	crand "crypto/rand"
 	"encoding/binary"
 	"github.com/ethereum/go-ethereum/common"
@@ -48,7 +49,6 @@ type DB struct {
 	fails map[ID]int
 	lastPingReceived map[ID]float64
 }
-
 
 
 // bucket contains nodes, ordered by their last activity. the entry
@@ -280,7 +280,7 @@ func (tab *Table) doRefresh(done chan struct{}) {
 
 	// Run self lookup to discover new neighbor nodes.
 	// We can only do this if we have a secp256k1 identity.
-	tab.lookup(encodePubkey(tab.self().publicKey), false)
+	tab.lookup(EncodePubKey(tab.self().publicKey), false)
 
 	// The Kademlia paper specifies that the bucket refresh should
 	// perform a lookup in the least recently used bucket. We cannot
@@ -327,6 +327,11 @@ func (tab *Table) doRevalidate(done chan<- struct{}) {
 		log.Debug("Removed dead node", "b", bi, "id", last.ID(), "checks", last.livenessChecks)
 	}
 }
+
+
+
+
+
 
 // nodeToRevalidate returns the last node in a random, non-empty bucket.
 func (tab *Table) nodeToRevalidate() (n *Node, bi int) {
@@ -406,7 +411,7 @@ func (tab *Table) addSeenNode(n *Node) {
 	// Add to end of bucket:
 	b.entries = append(b.entries, n)
 	b.replacements = deleteNode(b.replacements, n)
-	n.addedAt = time.Now()
+	n.addedAt = util.TimeNow()
 }
 
 // addVerifiedNode adds a node whose existence has been verified recently to the front of a
@@ -436,7 +441,7 @@ func (tab *Table) addVerifiedNode(n *Node) {
 	// Add to front of bucket.
 	b.entries, _ = pushNode(b.entries, n, bucketSize)
 	b.replacements = deleteNode(b.replacements, n)
-	n.addedAt = time.Now()
+	n.addedAt = util.TimeNow()
 }
 
 // delete removes an entry from the node table. It is used to evacuate dead nodes.

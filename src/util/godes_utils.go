@@ -3,7 +3,7 @@ package util
 import (
 	"fmt"
 	"github.com/agoussia/godes"
-	"math"
+	"time"
 )
 
 func Wait(time float64)  {
@@ -15,11 +15,14 @@ func Wait(time float64)  {
 }
 
 func Log(a ...interface{}){
-	sysTime := godes.GetSystemTime()
-	seconds := math.Mod(sysTime, 60)
-	minutes := math.Mod(sysTime/60, 60)
-	hours := math.Mod(sysTime/3600, 60)
-	fmt.Printf("%d:%d:%d \t %v \n", int(hours), int(minutes), int(seconds), a)
 
-	//fmt.Println(godes.GetSystemTime(), a)
+	sysTime := godes.GetSystemTime()
+
+	t := time.Now()
+	t1 := t.Add(time.Second * time.Duration(sysTime))
+	dif := t1.Sub(t)
+
+	fmt.Println(dif, a)
+
 }
+
