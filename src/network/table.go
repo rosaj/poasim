@@ -224,7 +224,7 @@ func (tab *Table) findnode(n *Node, targetKey encPubkey, onResponse func(nodes *
 		//tab.log("findnode respond ", nodes)
 		fails := tab.db.FindFails(n)
 
-		if err != nil {
+		if err == errMsgTimeout {
 			fails++
 			tab.db.UpdateFindFails(n, fails)
 		//	log.Trace("Findnode failed", "id", n.ID(), "failcount", fails, "err", err)
@@ -379,7 +379,7 @@ func (tab *Table) doRevalidate() {
 	//	tab.log("ping respond, ", m)
 		b := tab.buckets[bi]
 		// if the response is received withing the timeout time
-		if err == nil {
+		if err == nil || err != errMsgTimeout {
 			// The node responded, move it to the front.
 			last.livenessChecks[tab.self()]++
 			tab.log("Revalidated node", "b", bi, "id", last, "checks", last.livenessChecks[tab.self()])

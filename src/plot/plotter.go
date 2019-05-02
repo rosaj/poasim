@@ -26,6 +26,12 @@ func Stats(nodes []*network.Node)  {
 			all[key] = append(all[key], val...)
 			all["ALL"] = append(all["ALL"], val...)
 		}
+		received := node.GetMessagesReceived()
+
+		for key, val := range received {
+			all[key+"_RECEIVED"] = append(all[key+"_RECEIVED"], val...)
+			all["ALL_RECEIVED"] = append(all["ALL_RECEIVED"], val...)
+		}
 	}
 
 	fmt.Println("All msg gathered")
@@ -81,7 +87,13 @@ func Stats(nodes []*network.Node)  {
 		"Ping", ptss["PING"],
 		"Pong", ptss["PONG"],
 		"FindNode", ptss["FINDNODE"],
-		"Neighbors", ptss["NEIGHBORS"])
+		"Neighbors", ptss["NEIGHBORS"],
+		"SEND_ERR", ptss["SEND_ERR"],
+		"Ping_Received", ptss["PING_RECEIVED"],
+		"Pong_Received", ptss["PONG_RECEIVED"],
+		"FindNode_Received", ptss["FINDNODE_RECEIVED"],
+		"Neighbors_Received", ptss["NEIGHBORS_RECEIVED"],
+		"RECIEVE_ERR", ptss["RECIEVE_ERR"])
 
 	if err != nil {
 		panic(err)

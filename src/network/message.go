@@ -41,11 +41,6 @@ func (m *Message) Run() {
 
 	m.logSent()
 
-	if !m.From.IsOnline() {
-		m.handleError(errNodeOffline)
-		return
-	}
-
 	m.From.MarkMessageSend(m)
 
 	m.latency = config.SimConfig.NextNetworkLatency()
@@ -53,7 +48,6 @@ func (m *Message) Run() {
 	godes.Advance(m.latency)
 
 	if m.To.IsOnline() {
-
 		m.logReceived()
 
 		m.handle()
@@ -63,6 +57,9 @@ func (m *Message) Run() {
 		m.To.MarkMessageReceived(m)
 	} else {
 		m.handleError(errTimeout)
+		m.Type = "RECIEVE_ERR"
+		m.To.MarkMessageReceived(m)
+
 	}
 
 }
@@ -96,6 +93,16 @@ func newMessage(
 }
 
 func (m *Message) send() {
+
+	if !m.From.IsOnline() {
+		m.handleError(errNodeOffline)
+
+		m.Type = "SEND_ERR"
+		m.From.MarkMessageSend(m)
+
+		return
+	}
+
 	godes.AddRunner(m)
 }
 

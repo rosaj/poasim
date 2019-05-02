@@ -104,7 +104,7 @@ func (n *Node) IsOnline() bool {
 func (n *Node) setOnline(online bool)  {
 	n.online = online
 
-	util.Log(n, "went", online)
+	util.Log(n, "online:", online)
 }
 
 func (n *Node) MarkMessageSend(m *Message){

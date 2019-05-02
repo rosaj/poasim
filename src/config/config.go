@@ -61,9 +61,9 @@ type metricConfig struct {
 
 var SimConfig = config {
 
-	SimulationTime: (1 * 24 * time.Hour).Seconds(),
+	SimulationTime: ( 3 * 24 * time.Hour).Seconds(),
 
-	NodeCount: 10,
+	NodeCount: 3,
 
 	NodeStabilisationTime:  12 * time.Hour.Seconds(),
 
@@ -71,7 +71,7 @@ var SimConfig = config {
 
 	NodeArrivalDistr: NewNormalDistr(1*time.Minute.Seconds(), 0),
 
-	NodeSessionTimeDistr: NewExpDistr(1 / (1*time.Hour).Seconds()),
+	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Hour).Seconds())),
 
 	NodeIntersessionTimeDistr: NewExpDistr( 1 / (1 * time.Minute).Seconds()),
 
@@ -96,7 +96,7 @@ var LogConfig = logConfig {
 
 var MetricConfig  = metricConfig {
 
-	MsgGroupFactor: 60,
+	MsgGroupFactor: 5 * 60,
 
 
 }
