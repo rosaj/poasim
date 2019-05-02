@@ -103,7 +103,7 @@ func (n *Node) IsOnline() bool {
 
 func (n *Node) setOnline(online bool)  {
 	n.online = online
-
+	n.tab.SetOnline(online)
 	util.Log(n, "online:", online)
 }
 

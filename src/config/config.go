@@ -63,7 +63,7 @@ var SimConfig = config {
 
 	SimulationTime: ( 3 * 24 * time.Hour).Seconds(),
 
-	NodeCount: 3,
+	NodeCount: 30,
 
 	NodeStabilisationTime:  12 * time.Hour.Seconds(),
 

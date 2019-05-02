@@ -46,6 +46,9 @@ type Table struct {
 
 	refreshDone godes.BooleanControl
 
+
+	tableRunners []*tableRunner
+
 }
 type DB struct {
 	fails map[ID]int
@@ -82,11 +85,8 @@ func newTable(net *udp, bootstrapNodes []*Node) *Table {
 		tab.buckets[i] = &bucket{}
 	}
 
-	tab.seedRand()
-	tab.loadSeedNodes()
+	tab.goOnline()
 
-	// go
-	tab.loop()
 	return tab
 }
 
@@ -274,16 +274,69 @@ func (tab *Table) loop() {
 	tab.startRevalidateing()
 
 }
+func (tab *Table) SetOnline(online bool)  {
 
-type refreshRunner struct {
+	if !online{
+		tab.goOffline()
+	} else {
+		tab.goOnline()
+	}
+
+}
+func (tab *Table) goOffline()  {
+
+	for _, tr := range tab.tableRunners {
+		tr.stop()
+	}
+
+	tab.tableRunners = nil
+
+}
+
+func (tab *Table) goOnline()  {
+
+	tab.tableRunners = make([]*tableRunner, 0)
+
+
+	tab.seedRand()
+
+	// TODO: izbrisat nodove koji nebi bili spremljeni u bazu
+
+	tab.loadSeedNodes()
+
+	// go
+	tab.loop()
+}
+
+type tableRunner struct {
 	*godes.Runner
 	tab *Table
+	stopped bool
+
+}
+
+
+func (tableRunner *tableRunner) stop()  {
+	tableRunner.stopped = true
+}
+
+func (tab *Table) newTableRunner() *tableRunner {
+	tr :=  &tableRunner{&godes.Runner{}, tab, false}
+	tab.tableRunners = append(tab.tableRunners, tr)
+	return tr
+}
+
+type refreshRunner struct {
+	*tableRunner
 }
 
 func (r *refreshRunner) Run()  {
 	for{
 		godes.Advance(refreshInterval.Seconds())
 
+		if r.stopped {
+			return
+		}
 		//r.tab.log("table start refresh after ", float64(refreshInterval.Seconds()))
 		r.tab.seedRand()
 		r.tab.refresh()
@@ -292,12 +345,11 @@ func (r *refreshRunner) Run()  {
 }
 
 func (tab *Table) startRefreshing()  {
-	godes.AddRunner(&refreshRunner{&godes.Runner{}, tab})
+	godes.AddRunner(&refreshRunner{tab.newTableRunner()})
 }
 
 type revalidateRunner struct {
-	*godes.Runner
-	tab *Table
+	*tableRunner
 }
 
 func (r *revalidateRunner) Run()  {
@@ -308,6 +360,9 @@ func (r *revalidateRunner) Run()  {
 
 		godes.Advance(t)
 
+		if r.stopped {
+			return
+		}
 		//tab.log("table start revalidate ", t)
 		tab.doRevalidate()
 	}
@@ -315,8 +370,7 @@ func (r *revalidateRunner) Run()  {
 }
 
 func (tab *Table) startRevalidateing()  {
-	godes.AddRunner(&revalidateRunner{&godes.Runner{}, tab})
-
+	godes.AddRunner(&revalidateRunner{tab.newTableRunner()})
 }
 
 // doRefresh performs a lookup for a random target to keep buckets
