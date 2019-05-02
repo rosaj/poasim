@@ -1,91 +1,150 @@
 package main
 
 import (
+	"../config"
 	"../network"
+	"../plot"
 	"../util"
 	"fmt"
 	"github.com/agoussia/godes"
+	"math"
 	"runtime"
 	sysTime "time"
 )
 
 
 
-var nodes *Nodes
 
+func runBootstrapNodes() []*network.Node {
 
-var trQueue = godes.NewFIFOQueue("0")
-var trAdded = godes.NewBooleanControl()
+	bootstrapNodes := make([]*network.Node, 3)
 
-
-
-type Nodes  struct {
-	count int
-}
-
-type Transaction struct{
-	num int
-}
-
-func main(){
-	runtime.GOMAXPROCS(1)
-
-	start:= sysTime.Now()
-
-	nodes := make([]*network.Node, 3)
-	godes.Run()
-	for i:=0 ; i < len(nodes); i++{
-		node := network.NewNode(func(node *network.Node) {
-					for{
-						util.Wait(10)
-						for _, n := range nodes {
-							if n != node{
-								node.Ping(n)
-							}
-						}
-					}
-				})
-		nodes[i] = node
-		godes.AddRunner(node)
+	for i := 0; i < len(bootstrapNodes); i++{
+		bootstrapNodes[i] = network.NewBootstrapNode(bootstrapNodes)
 	}
 
-
-	util.Wait(30)
-	godes.Clear()
-	elapsed := sysTime.Since(start)
-	fmt.Println(elapsed)
-
-	//godes.WaitUntilDone()
-
-/*
-	nodes = &Nodes{config.ValidatorCount}
-
-	trAdded.Set(false)
-	godes.Run()
-
-	for i := 0; i < nodes.count; i++ {
-		node := NewNode()
-
-		godes.AddRunner(node)
+	for i := 0; i < len(bootstrapNodes); i++{
+		godes.AddRunner(bootstrapNodes[i])
 	}
 
-	counter := 1
+	godes.Run()
 
-	for {
+	return bootstrapNodes
+}
 
-		trQueue.Place(&Transaction{counter})
-		trAdded.Set(true)
-		godes.Advance(config.nextTrInterval())
+func createNodes(bootstrapNodes []*network.Node) []*network.Node  {
 
-		counter += 1
+	nodes := make([]*network.Node, config.SimConfig.NodeCount)
 
-		if godes.GetSystemTime() > config.SimulationTime {
-			break
+	for i:=0 ; i < len(nodes); i++ {
+		nodes[i] = network.NewNode(bootstrapNodes)
+	}
+
+	return nodes
+}
+
+func runNodes() []*network.Node {
+
+	bNodes := runBootstrapNodes()
+
+	nodes := createNodes(bNodes)
+
+
+	for i:= 0; i < len(nodes) ; i++ {
+
+		nodeArrival := config.SimConfig.NextNodeArrival()
+
+		if nodeArrival > 0 {
+			godes.Advance(nodeArrival)
 		}
 
+		godes.AddRunner(nodes[i])
+		fmt.Println(math.Round(godes.GetSystemTime()/config.SimConfig.SimulationTime), "% - Added node:", nodes[i])
 	}
 
+	fmt.Println("Added all nodes")
+	return append(nodes, bNodes...)
+}
+
+func runSim(){
+
+	runtime.GOMAXPROCS(1)
+
+	startTime:= sysTime.Now()
+
+	util.Log("start")
+
+
+	nodes := runNodes()
+
+
+	waitForSimEnd(startTime)
+
+	if godes.GetSystemTime() > config.SimConfig.SimulationTime {
+		config.SimConfig.SimulationTime = godes.GetSystemTime()
+	}
+
+	config.LogConfig.Logging = true
+
+	elapsed := sysTime.Since(startTime)
+	util.Log("Simulation end after:", elapsed)
+
 	godes.Clear()
-	//godes.WaitUntilDone()
-*/
+
+	showStats(nodes)
+
+}
+
+func waitForSimEnd(startTime sysTime.Time)  {
+	dif := config.SimConfig.SimulationTime - godes.GetSystemTime()
+
+	if dif > 0 {
+
+		if config.LogConfig.Logging {
+			godes.Advance(dif)
+		} else {
+
+			initialPct := math.Floor((godes.GetSystemTime()/config.SimConfig.SimulationTime)*100)/100
+
+			chunks := 100
+			part := dif / float64(chunks)
+
+			for i := 1; i <= chunks; i++ {
+				godes.Advance(part)
+
+				config.LogConfig.Logging = true
+
+				elapsed := sysTime.Since(startTime)
+
+				percentage := math.Round( ( initialPct + (float64(i)*part)/config.SimConfig.SimulationTime)  * 100)
+				//percentage := math.Floor((((float64(i)*part)/dif )/(1-initialPct) - initialPct ) *100)
+
+				util.Log(percentage, "%: elapsed:", elapsed)
+
+				if percentage < 98 {
+					config.LogConfig.Logging = false
+				}
+			}
+		}
+	}
+}
+
+
+func showStats(nodes []*network.Node)  {
+
+	sum := 0
+	for _, node := range nodes {
+		totalSent := node.GetTotalMessagesSent()
+		sum += totalSent
+	}
+
+	fmt.Println("Sum sent", sum)
+	fmt.Println("Average sent", sum/len(nodes))
+	plot.Stats(nodes)
+}
+
+
+func main()  {
+	runSim()
+	//plot.Test()
 }

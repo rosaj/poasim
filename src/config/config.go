@@ -2,48 +2,162 @@ package config
 
 import (
 	"github.com/agoussia/godes"
+	"time"
 )
 
-var repetition = false
-
-var TrDistr = godes.NewExpDistr(repetition)
-
-var NodePingDistr = godes.NewExpDistr(repetition)
-
 type config struct {
+
+	// vrijeme trajanja simulacije u sekundama, ignorira se ako spajanje svih cvorova traje vise od simulacije
 	SimulationTime float64
 
-	ValidatorCount int
+	// broj cvorova koji se trebaju dodati u simulaciju
+	NodeCount int
 
-	TrArrivalInterval float64
+	// ako je postavljeno na true cvorovi mogu napustat i dolazit natrag na mrezu
+	ChurnEnabled bool
 
-	NodePingTime float64
+	// vrijme cekanja stabilizacije mreze nakon spajanja svih cvorova (nema odspajanja i spajanja cvorova)
+	NodeStabilisationTime float64
+
+	// distribucija dolaska cvorova na mrezu
+	NodeArrivalDistr distribution
+
+	// distribucija trajanja sesija cvorova
+	NodeSessionTimeDistr distribution
+
+	// distribucija trajanja nedostupnosti(offline) cvorova
+	NodeIntersessionTimeDistr distribution
+
+	// vrijeme od kada se cvor spoji na mrezu do kada se zauvjek odspoji
+	NodeLifetimeDistr distribution
+
+	// latencija slanja poruke preko mreze
+	NetworkLatency distribution
+
+	NetworkUnreliability float64
+
+	LostMessagesDistr distribution
+
+	MinerCount int
 
 	BlockTime float64
+
+	TransactionIntervalDistr distribution
+}
+
+type logConfig struct {
+
+	Logging bool
+
+	LogMessages bool
+}
+
+type metricConfig struct {
+
+	MsgGroupFactor float64
+
 }
 
 
-var test = config{
-	SimulationTime:  1 * 60,
-	ValidatorCount: 6,
-	NodePingTime: 0.25,
-	TrArrivalInterval: 0.5,
+var SimConfig = config {
+
+	SimulationTime: (1 * 24 * time.Hour).Seconds(),
+
+	NodeCount: 10,
+
+	NodeStabilisationTime:  12 * time.Hour.Seconds(),
+
+	ChurnEnabled: true,
+
+	NodeArrivalDistr: NewNormalDistr(1*time.Minute.Seconds(), 0),
+
+	NodeSessionTimeDistr: NewExpDistr(1 / (1*time.Hour).Seconds()),
+
+	NodeIntersessionTimeDistr: NewExpDistr( 1 / (1 * time.Minute).Seconds()),
+
+	NodeLifetimeDistr: NewExpDistr(1 / (111115 * time.Hour.Seconds())),
+
+	NetworkLatency:  NewLogNormalDistr(.209,.157),// u metodi NextNetworkLatency dodano /10
+
+	MinerCount: 6,
+
 	BlockTime: 15,
+
+	TransactionIntervalDistr: NewExpDistr(0.2),
+
 }
 
-var SimConfig = test
+var LogConfig = logConfig {
+
+	Logging: false,
+
+	LogMessages: false,
+}
+
+var MetricConfig  = metricConfig {
+
+	MsgGroupFactor: 60,
 
 
+}
 
-
-func(config *config) NextTrInterval() (interval float64){
-	interval = TrDistr.Get(1 / config.TrArrivalInterval)
-//	Log("TrInterval: ", interval)
+func (config *config) NextTrInterval() (interval float64) {
+	interval = config.TransactionIntervalDistr.nextValue()
+	//	Log("TrInterval: ", interval)
 	return
 }
 
 func (config *config) NextNetworkLatency() (interval float64) {
-	interval = NodePingDistr.Get(1 / config.NodePingTime)
+	interval = config.NetworkLatency.nextValue() / 10
 	return
 }
 
+func (config *config) NextNodeArrival() (interval float64) {
+	interval = config.NodeArrivalDistr.nextValue()
+	//fmt.Println("NodeInterval: ", interval)
+	return
+}
+
+func (config *config) NextNodeSessionTime() (interval float64) {
+	interval = clampToSimTime(config, config.NodeSessionTimeDistr)
+	//fmt.Println(interval)
+	return
+}
+
+func (config *config) NextNodeIntersessionTime() (interval float64)  {
+	interval = clampToSimTime(config, config.NodeIntersessionTimeDistr)
+	return
+}
+
+func clampToSimTime(config *config, distr distribution) (interval float64)  {
+	interval = distr.nextValue()
+
+	sysTime := godes.GetSystemTime()
+
+	if estimatedNodeArrival := config.NextNodeArrival() * float64(config.NodeCount); sysTime < estimatedNodeArrival{
+		interval += estimatedNodeArrival + config.NodeStabilisationTime
+		sysTime = estimatedNodeArrival
+
+	} else if sysTime < config.NodeStabilisationTime {
+		// session traje stabilization time + interval iz distribucije
+		interval += config.NodeStabilisationTime - sysTime
+
+
+		// da se ne prekoraci sim time
+		if dif := config.SimulationTime - sysTime; dif >= 0 && interval > dif {
+			interval = dif
+		}
+	}
+
+	return
+}
+
+func (config *config) NextNodeLifetime() (interval float64) {
+	interval = config.NodeLifetimeDistr.nextValue()
+	//fmt.Println(interval)
+	return
+}
+
+func (config *config) SimulationEnded() bool {
+	return godes.GetSystemTime() >= config.SimulationTime
+}

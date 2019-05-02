@@ -1,13 +1,12 @@
 package network
 
-/*
 import (
 	"../util"
 	crand "crypto/rand"
 	"encoding/binary"
+	"github.com/agoussia/godes"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
 	"math/bits"
 	mrand "math/rand"
 	"sort"
@@ -42,12 +41,16 @@ type Table struct {
 	buckets [nBuckets]*bucket // index of known nodes by distance
 	nursery []*Node           // bootstrap nodes
 	rand    *mrand.Rand       // source of randomness, periodically reseeded
-	db DB
-	net        udp
+	db *DB
+	net        *udp
+
+	refreshDone godes.BooleanControl
+
 }
 type DB struct {
 	fails map[ID]int
 	lastPingReceived map[ID]float64
+	lastPongReceived map[ID]float64
 }
 
 
@@ -63,22 +66,35 @@ func newDB() *DB{
 	return &DB{
 		fails: make(map[ID]int),
 		lastPingReceived: make(map[ID]float64),
+		lastPongReceived: make(map[ID]float64),
 	}
 }
-func newTable(net udp) (*Table) {
+func newTable(net *udp, bootstrapNodes []*Node) *Table {
 	tab := &Table{
 		net:        net,
-		db:			*net.db,
+		db:			net.db,
 		rand:       mrand.New(mrand.NewSource(0)),
 	}
 
-	tab.seedRand()
+	tab.nursery = bootstrapNodes
 
-	go tab.loop()
+	for i := range tab.buckets {
+		tab.buckets[i] = &bucket{}
+	}
+
+	tab.seedRand()
+	tab.loadSeedNodes()
+
+	// go
+	tab.loop()
 	return tab
 }
 
-func (tab *Table) self() Node {
+func (tab *Table) log(s ...interface{})  {
+	util.Log(tab.self().Name(), s)
+}
+
+func (tab *Table) self() *Node {
 	return tab.net.self()
 }
 
@@ -129,11 +145,12 @@ func (tab *Table) ReadRandomNodes(buf []*Node) (n int) {
 // target by querying nodes that are closer to it on each iteration. The given target does
 // not need to be an actual node identifier.
 func (tab *Table) lookup(targetKey encPubkey, refreshIfEmpty bool) []*Node {
+	//tab.log("lookup ", refreshIfEmpty)
 	var (
 		target         = ID(crypto.Keccak256Hash(targetKey[:]))
 		asked          = make(map[ID]bool)
 		seen           = make(map[ID]bool)
-		reply          = make(chan []*Node, alpha)
+	//	reply          = make(chan []*Node, alpha)
 		pendingQueries = 0
 		result         *nodesByDistance
 	)
@@ -141,142 +158,174 @@ func (tab *Table) lookup(targetKey encPubkey, refreshIfEmpty bool) []*Node {
 	// unlikely to happen often in practice.
 	asked[tab.self().ID()] = true
 
-	for {
-		
-		// generate initial result set
+
+	// generate initial result set
+	result = tab.closest(target, bucketSize)
+
+	if len(result.entries) == 0 && refreshIfEmpty {
+		// make a table refresh and wait for it to finish
+		tab.refresh()
+		tab.refreshDone.Wait(true)
+		// get the closest results
 		result = tab.closest(target, bucketSize)
-		
-		if len(result.entries) > 0 || !refreshIfEmpty {
-			break
-		}
-		// The result set is empty, all nodes were dropped, refresh.
-		// We actually wait for the refresh to complete here. The very
-		// first query will hit this case and run the bootstrapping
-		// logic.
-		<-tab.refresh()
-		refreshIfEmpty = false
 	}
 
-	for {
-		// ask the alpha closest nodes that we haven't asked yet
-		for i := 0; i < len(result.entries) && pendingQueries < alpha; i++ {
-			n := result.entries[i]
-			if !asked[n.ID()] {
-				asked[n.ID()] = true
-				pendingQueries++
-				go tab.findnode(n, targetKey, reply)
-			}
-		}
-		if pendingQueries == 0 {
-			// we have asked all closest nodes, stop the search
-			break
-		}
-		select {
-		case nodes := <-reply:
-			for _, n := range nodes {
-				if n != nil && !seen[n.ID()] {
-					seen[n.ID()] = true
-					result.push(n, bucketSize)
-				}
-			}
-		}
-		pendingQueries--
-	}
+
+
+	tab.lookupNode(&pendingQueries, result, asked, seen, targetKey)
+
+
 	return result.entries
 }
 
+func (tab *Table) lookupNode(pendingQueries *int, result *nodesByDistance, asked map[ID]bool, seen map[ID]bool, targetKey encPubkey)  {
 
-func (tab *Table) findnode(n *Node, targetKey encPubkey, reply chan<- []*Node) {
+	// ask the alpha closest nodes that we haven't asked yet
+	// when a node responds, ask another node if we can
+	// the goal is to ask all the closest nodes with maximum of alpha pending requests
+
+	// ask the alpha closest nodes that we haven't asked yet
+	for i := 0; i < len(result.entries) && *pendingQueries < alpha; i++ {
+	//	tab.log("lookupnode:", len(result.entries), *pendingQueries, len(asked), len(seen))
+		n := result.entries[i]
+		if !asked[n.ID()] {
+			asked[n.ID()] = true
+			*pendingQueries++
+
+		//	tab.log("lookup-findnode ", targetKey)
+			// go
+			tab.findnode(n, targetKey, func(nodesByDist *nodesByDistance, err error) {
+				if nodesByDist != nil {
+
+					nodes := nodesByDist.entries
+					for _, n := range nodes {
+						if n != nil && !seen[n.ID()] {
+							seen[n.ID()] = true
+							result.push(n, bucketSize)
+						}
+					}
+				}
+				*pendingQueries--
+
+				tab.lookupNode(pendingQueries, result, asked, seen, targetKey)
+			})
+		}
+	}
 
 
-	tab.net.findnode(n, targetKey, func(m *Message) {
+}
+
+func (tab *Table) findnode(n *Node, targetKey encPubkey, onResponse func(nodes *nodesByDistance, err error)) {
+
+	//tab.log("findnode: ", n.Name())
+
+	tab.net.findnode(n, targetKey, func(nodes *nodesByDistance, err error) {
+
+		//tab.log("findnode respond ", nodes)
 		fails := tab.db.FindFails(n)
 
-		r := m.Content.(*nodesByDistance).entries
-		if len(r) == 0 {
+		if err != nil {
 			fails++
 			tab.db.UpdateFindFails(n, fails)
-			log.Trace("Findnode failed", "id", n.ID(), "failcount", fails, "err", err)
+		//	log.Trace("Findnode failed", "id", n.ID(), "failcount", fails, "err", err)
 			if fails >= maxFindnodeFailures {
-				log.Trace("Too many findnode failures, dropping", "id", n.ID(), "failcount", fails)
+		//		log.Trace("Too many findnode failures, dropping", "id", n.ID(), "failcount", fails)
 				tab.delete(n)
 			}
 		} else if fails > 0 {
 			tab.db.UpdateFindFails(n, fails-1)
 		}
 
-		// Grab as many nodes as possible. Some of them might not be alive anymore, but we'll
-		// just remove those again during revalidation.
-		for _, n := range r {
-			tab.addSeenNode(n)
+		if nodes != nil {
+			r := nodes.entries
+			// Grab as many nodes as possible. Some of them might not be alive anymore, but we'll
+			// just remove those again during revalidation.
+			for _, n := range r {
+				tab.addSeenNode(n)
+			}
 		}
-		reply <- r
+
+		if onResponse != nil {
+			onResponse(nodes, err)
+		}
+
 	})
 
 
 }
 
-func (tab *Table) refresh() <-chan struct{} {
-	done := make(chan struct{})
-	select {
-	case tab.refreshReq <- done:
-	case <-tab.closeReq:
-		close(done)
+func (tab *Table) refresh() {
+	if tab.refreshDone.GetState(){
+		tab.doRefresh()
 	}
-	return done
 }
 
 // loop schedules refresh, revalidate runs and coordinates shutdown.
 func (tab *Table) loop() {
-	var (
-		revalidate     = time.NewTimer(tab.nextRevalidateTime())
-		refresh        = time.NewTicker(refreshInterval)
-		copyNodes      = time.NewTicker(copyNodesInterval)
-		refreshDone    = make(chan struct{})           // where doRefresh reports completion
-		revalidateDone chan struct{}                   // where doRevalidate reports completion
-		waiting        = []chan struct{}{tab.initDone} // holds waiting callers while doRefresh runs
-	)
-	defer refresh.Stop()
-	defer revalidate.Stop()
-	defer copyNodes.Stop()
-
+//	tab.log("table loop")
 	// Start initial refresh.
-	go tab.doRefresh(refreshDone)
+	// go
+	tab.doRefresh()
 
-loop:
-	for {
-		select {
-		case <-refresh.C:
-			tab.seedRand()
-			if refreshDone == nil {
-				refreshDone = make(chan struct{})
-				go tab.doRefresh(refreshDone)
-			}
-		case req := <-tab.refreshReq:
-			waiting = append(waiting, req)
-			if refreshDone == nil {
-				refreshDone = make(chan struct{})
-				go tab.doRefresh(refreshDone)
-			}
-		case <-refreshDone:
-			for _, ch := range waiting {
-				close(ch)
-			}
-			waiting, refreshDone = nil, nil
-		case <-revalidate.C:
-			revalidateDone = make(chan struct{})
-			go tab.doRevalidate(revalidateDone)
-		case <-revalidateDone:
-			revalidate.Reset(tab.nextRevalidateTime())
-			revalidateDone = nil
-		}
+	// go
+	tab.startRefreshing()
+
+	// go
+	tab.startRevalidateing()
+
+}
+
+type refreshRunner struct {
+	*godes.Runner
+	tab *Table
+}
+
+func (r *refreshRunner) Run()  {
+	for{
+		godes.Advance(refreshInterval.Seconds())
+
+		//r.tab.log("table start refresh after ", float64(refreshInterval.Seconds()))
+		r.tab.seedRand()
+		r.tab.refresh()
 	}
+
+}
+
+func (tab *Table) startRefreshing()  {
+	godes.AddRunner(&refreshRunner{&godes.Runner{}, tab})
+}
+
+type revalidateRunner struct {
+	*godes.Runner
+	tab *Table
+}
+
+func (r *revalidateRunner) Run()  {
+	tab := r.tab
+	for {
+
+		t := tab.nextRevalidateTime().Seconds()
+
+		godes.Advance(t)
+
+		//tab.log("table start revalidate ", t)
+		tab.doRevalidate()
+	}
+
+}
+
+func (tab *Table) startRevalidateing()  {
+	godes.AddRunner(&revalidateRunner{&godes.Runner{}, tab})
+
 }
 
 // doRefresh performs a lookup for a random target to keep buckets
 // full. seed nodes are inserted if the table is empty (initial
 // bootstrap or discarded faulty peers).
-func (tab *Table) doRefresh(done chan struct{}) {
+func (tab *Table) doRefresh() {
+
+	//tab.log("table do refresh ")
+	tab.refreshDone.Set(false)
 
 	// Run self lookup to discover new neighbor nodes.
 	// We can only do this if we have a secp256k1 identity.
@@ -293,42 +342,60 @@ func (tab *Table) doRefresh(done chan struct{}) {
 		crand.Read(target[:])
 		tab.lookup(target, false)
 	}
+
+	tab.refreshDone.Set(true)
 }
+
+
+
+
+func (tab *Table) loadSeedNodes() {
+	nodes := tab.nursery
+	for i := range nodes {
+		seed := nodes[i]
+		tab.log("Load boostrap node: ", seed.Name())
+		tab.addSeenNode(seed)
+	}
+}
+
+
+
 
 // doRevalidate checks that the last node in a random bucket is still live
 // and replaces or deletes the node if it isn't.
-func (tab *Table) doRevalidate(done chan<- struct{}) {
-	defer func() { done <- struct{}{} }()
+func (tab *Table) doRevalidate() {
 
+	//tab.log("table do revalidate ")
 	last, bi := tab.nodeToRevalidate()
 	if last == nil {
 		// No non-empty bucket found.
 		return
 	}
 
-	// Ping the selected node and wait for a pong.
-	err := tab.net.ping(last)
-	tab.self().Ping(last)
-	
-	
-	b := tab.buckets[bi]
-	if err == nil {
-		// The node responded, move it to the front.
-		last.livenessChecks++
-		log.Debug("Revalidated node", "b", bi, "id", last.ID(), "checks", last.livenessChecks)
-		tab.bumpInBucket(b, last)
-		return
-	}
-	// No reply received, pick a replacement or delete the node if there aren't
-	// any replacements.
-	if r := tab.replace(b, last); r != nil {
-		log.Debug("Replaced dead node", "b", bi, "id", last.ID(), "checks", last.livenessChecks, "r", r.ID())
-	} else {
-		log.Debug("Removed dead node", "b", bi, "id", last.ID(), "checks", last.livenessChecks)
-	}
+	// Ping the selected node and wait for a ping.
+	//err := tab.net.ping(last)
+
+	tab.self().sendPingPackage(last, func(m *Message, err error) {
+	//	tab.log("ping respond, ", m)
+		b := tab.buckets[bi]
+		// if the response is received withing the timeout time
+		if err == nil {
+			// The node responded, move it to the front.
+			last.livenessChecks[tab.self()]++
+			tab.log("Revalidated node", "b", bi, "id", last, "checks", last.livenessChecks[tab.self()])
+			tab.bumpInBucket(b, last)
+			return
+		}
+		// No reply received, pick a replacement or delete the node if there aren't
+		// any replacements.
+		if r := tab.replace(b, last); r != nil {
+			tab.log("Replaced dead node", "b", bi, "id", last, "checks", last.livenessChecks[tab.self()], "r", r)
+		} else {
+			tab.log("Removed dead node", "b", bi, "id", last, "checks", last.livenessChecks[tab.self()])
+		}
+
+	})
 }
-
-
 
 
 
@@ -364,7 +431,7 @@ func (tab *Table) closest(target ID, nresults int) *nodesByDistance {
 	close := &nodesByDistance{target: target}
 	for _, b := range &tab.buckets {
 		for _, n := range b.entries {
-			if n.livenessChecks > 0 {
+			if n.livenessChecks[tab.self()] > 0 {
 				close.push(n, nresults)
 			}
 		}
@@ -391,8 +458,6 @@ func (tab *Table) bucket(id ID) *bucket {
 // addSeenNode adds a node which may or may not be live to the end of a bucket. If the
 // bucket has space available, adding the node succeeds immediately. Otherwise, the node is
 // added to the replacements list.
-//
-// The caller must not hold tab.mutex.
 func (tab *Table) addSeenNode(n *Node) {
 	if n.ID() == tab.self().ID() {
 		return
@@ -408,10 +473,12 @@ func (tab *Table) addSeenNode(n *Node) {
 		tab.addReplacement(b, n)
 		return
 	}
+
+	tab.log("addSeenNode: ", n.Name())
 	// Add to end of bucket:
 	b.entries = append(b.entries, n)
 	b.replacements = deleteNode(b.replacements, n)
-	n.addedAt = util.TimeNow()
+	n.addedAt = godes.GetSystemTime()
 }
 
 // addVerifiedNode adds a node whose existence has been verified recently to the front of a
@@ -420,7 +487,7 @@ func (tab *Table) addSeenNode(n *Node) {
 //
 // There is an additional safety measure: if the table is still initializing the node
 // is not added. This prevents an attack where the table could be filled by just sending
-// ping repeatedly.
+// sendPingPackage repeatedly.
 //
 // The caller must not hold tab.mutex.
 func (tab *Table) addVerifiedNode(n *Node) {
@@ -441,7 +508,7 @@ func (tab *Table) addVerifiedNode(n *Node) {
 	// Add to front of bucket.
 	b.entries, _ = pushNode(b.entries, n, bucketSize)
 	b.replacements = deleteNode(b.replacements, n)
-	n.addedAt = util.TimeNow()
+	n.addedAt = godes.GetSystemTime()
 }
 
 // delete removes an entry from the node table. It is used to evacuate dead nodes.
@@ -456,6 +523,7 @@ func (tab *Table) addReplacement(b *bucket, n *Node) {
 		}
 	}
 
+	tab.log("addReplacement: ", n.Name())
 	var _ *Node
 	b.replacements, _ = pushNode(b.replacements, n, maxReplacements)
 }
@@ -534,6 +602,9 @@ type nodesByDistance struct {
 	target  ID
 }
 
+func (n *nodesByDistance) String() string {
+	return string(len(n.entries))
+}
 // push adds the given node to the list, keeping the total size below maxElems.
 func (h *nodesByDistance) push(n *Node, maxElems int) {
 	ix := sort.Search(len(h.entries), func(i int) bool {
@@ -598,4 +669,11 @@ func (db *DB) UpdateLastPingReceived(n *Node, time float64)  {
 func (db *DB) LastPingReceived(n *Node) float64 {
 	return db.lastPingReceived[n.ID()]
 }
-*/
+
+func (db *DB) UpdateLastPongReceived(n *Node, time float64) ()  {
+	db.lastPongReceived[n.ID()] = time
+}
+
+func (db *DB) LastPongReceived(n *Node) float64 {
+	return db.lastPongReceived[n.ID()]
+}

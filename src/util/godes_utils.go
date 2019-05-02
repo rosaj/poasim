@@ -1,28 +1,26 @@
 package util
 
 import (
+	"../config"
 	"fmt"
 	"github.com/agoussia/godes"
 	"time"
 )
 
-func Wait(time float64)  {
-	bControl := godes.NewBooleanControl()
-	bControl.Set(false)
-
-	bControl.WaitAndTimeout(true,time )
-
-}
 
 func Log(a ...interface{}){
 
-	sysTime := godes.GetSystemTime()
+	if !config.LogConfig.Logging {
+		return
+	}
 
-	t := time.Now()
-	t1 := t.Add(time.Second * time.Duration(sysTime))
-	dif := t1.Sub(t)
-
-	fmt.Println(dif, a)
-
+	fmt.Println(ToDuration(godes.GetSystemTime()), a)
 }
 
+func ToDuration(seconds float64)  time.Duration {
+
+	t := time.Now()
+	t1 := t.Add(time.Second * time.Duration(seconds))
+	dif := t1.Sub(t)
+	return dif
+}

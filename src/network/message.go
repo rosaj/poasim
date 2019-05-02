@@ -3,106 +3,162 @@ package network
 import (
 	"../config"
 	"../util"
+	"errors"
 	"fmt"
 	"github.com/agoussia/godes"
 )
 
+
+
+var (
+	errMsgTimeout          = errors.New("msg timeout")
+	errNodeOffline		   = errors.New("node offline")
+	errPacketLost		   = errors.New("packet lost")
+)
+
+
+
 type Message struct {
 	godes.Runner
-	Type string
+	Type    string
 	Content interface{}
-	From *Node
-	To *Node
+	From    *Node
+	To      *Node
 
-	handler func()
-	onResponse func(m *Message)
+	Expiration float64
+	//TODO: poruka ima velicinu i latencija ovisi o velicini
+
+	latency    float64
+	handler    func()
+	onResponse func(m *Message, err error)
 
 	responseTo *Message
+
+	responseTimeout float64
 }
 
-func (m *Message) Run()  {
-	util.Log("Send message: ", m)
-	godes.Advance(config.SimConfig.NextNetworkLatency())
-	util.Log("Message ", m.Type, " received: ", m.String())
+func (m *Message) Run() {
 
-	m.handle()
-	m.responded()
-}
+	m.logSent()
 
-
-func newMessage(from *Node, to *Node, msgType string,
-	content interface{}, handler func(), responseTo *Message, onResponse func(m *Message)) (m *Message){
-	m = &Message{}
-	m.Runner = godes.Runner{}
-	m.Type = msgType
-	m.Content = content
-	m.From = from
-	m.To = to
-	m.handler = handler
-	m.onResponse = onResponse
-	m.responseTo = responseTo
-
-	return
-}
-
-func NewPingMessage(from *Node, to *Node, onResponse func(m *Message)) (m *Message) {
-	m = newMessage(from, to, "PING", "ping",
-		func() {
-		m.To.Pong(m.From, m)
-	}, nil, onResponse)
-	return
-}
-
-func NewPongMessage(from *Node, to *Node, responseTo *Message) (m *Message)  {
-	m = newMessage(from, to, "PONG", "pong", nil, responseTo, nil)
-	return
-}
-
-func (n *Node) Ping(node *Node){
-	msg := NewPingMessage(n, node, func(m *Message) {
-
-	})
-	msg.send()
-}
-
-func (n *Node) Pong(node *Node, responseToPingMsg *Message)  {
-	msg := NewPongMessage(n, node, responseToPingMsg)
-	msg.send()
-}
-
-/*
-func NewFindNodeMessage(from Node, to Node, pubkey encPubkey) (m *Message)  {
-	m = newMessage(from, to, "FINDNODE", pubkey)
-	m.handler = func() {
-		m.To.Neighbors(&m.From, m.To.tab.Closest(pubkey))
+	if !m.From.IsOnline() {
+		m.handleError(errNodeOffline)
+		return
 	}
+
+	m.From.MarkMessageSend(m)
+
+	m.latency = config.SimConfig.NextNetworkLatency()
+
+	godes.Advance(m.latency)
+
+	if m.To.IsOnline() {
+
+		m.logReceived()
+
+		m.handle()
+
+		m.responded()
+
+		m.To.MarkMessageReceived(m)
+	} else {
+		m.handleError(errTimeout)
+	}
+
+}
+
+
+func newMessage(
+	from *Node,
+	to *Node,
+	msgType string,
+	content interface{},
+	expiration float64,
+	handler func(),
+	responseTo *Message,
+	onResponse func(m *Message, err error),
+	responseTimeout float64) (m *Message) {
+
+	m = &Message{
+		Runner: godes.Runner{},
+		Type: msgType,
+		Content: content,
+		From: from,
+		To: to,
+		Expiration: expiration,
+		handler: handler,
+		onResponse: onResponse,
+		responseTo: responseTo,
+		responseTimeout: responseTimeout,
+	}
+
 	return
 }
 
-func NewNeighborsMessage(from Node, to Node, nodes nodesByDistance) (m *Message)  {
-	m = newMessage(from, to, "NEIGHBORS", nodes)
-	m.handler = func() {
-		//TODO: handle neighbors message
-	}
-	return
-}
-*/
-func (m *Message) send(){
+func (m *Message) send() {
 	godes.AddRunner(m)
 }
 
-func (m *Message) handle()  {
+func (m *Message) handle() {
 	if m.handler != nil {
 		m.handler()
 	}
 }
-func (m *Message) responded(){
-	if m.responseTo != nil && m.responseTo.onResponse != nil{
-		util.Log("Responded to msg: ", m.responseTo, " with: ", m)
-		m.responseTo.onResponse(m)
+
+
+func (m *Message) handleError(err error)  {
+	// ako je latencija veca od timeouta onda bi razlika bila negativna
+	if m.responseTimeout > 0 && m.responseTimeout > m.latency {
+		// vec je pozvana advance metoda za latency
+		godes.Advance(m.responseTimeout - m.latency)
 	}
+
+	m.logError(err)
+
+	if m.onResponse != nil {
+		m.onResponse(nil, err)
+	}
+
+}
+
+func (m *Message) responded() {
+
+	if m.responseTo != nil && m.responseTo.onResponse != nil {
+
+		if config.LogConfig.LogMessages {
+			util.Log("Responded to msg:", m.responseTo, "with:", m)
+		}
+
+		m.responseTo.onResponse(m, nil)
+	}
+
 }
 func (m *Message) String() string {
 	return fmt.Sprintf("[%s] from %s to %s", m.Type, m.From.Name(), m.To.Name())
 }
+func (m *Message) HasExpired() (expired bool) {
+	expired = m.Expiration < godes.GetSystemTime()
+	return
+}
 
+func (m *Message) GetLatency() float64 {
+	return m.latency
+}
+
+func (m *Message) logSent() {
+	if config.LogConfig.LogMessages {
+		util.Log("Send message:", m)
+	}
+}
+
+func (m *Message) logReceived() {
+	if config.LogConfig.LogMessages {
+		util.Log("Message", m.Type, "received:", m.String(), "in", m.latency, "sec")
+	}
+}
+
+func (m *Message) logError(err error) {
+	if config.LogConfig.LogMessages {
+		util.Log("Message", m, "- error:",err, "in", m.responseTimeout, "sec, Sender online:",m.From.IsOnline(), "Receiver online:", m.To.IsOnline())
+	}
+}
