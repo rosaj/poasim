@@ -1,9 +1,9 @@
 package network
 
 import (
+	"../util"
 	"bytes"
 	crand "crypto/rand"
-	"util"
 )
 
 type DB struct {
