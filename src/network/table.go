@@ -24,10 +24,6 @@ const (
 	nBuckets          = hashBits / 15       // Number of buckets
 	bucketMinDistance = hashBits - nBuckets // Log distance of closest bucket
 
-	// IP address limits.
-	bucketIPLimit, bucketSubnet = 2, 24 // at most 2 addresses from the same /24
-	tableIPLimit, tableSubnet   = 10, 24
-
 	maxFindnodeFailures = 5 // Nodes exceeding this limit are dropped
 	refreshInterval     = 30 * time.Minute
 	revalidateInterval  = 10 * time.Second
@@ -50,12 +46,6 @@ type Table struct {
 	tableRunners []*tableRunner
 
 }
-type DB struct {
-	fails map[ID]int
-	lastPingReceived map[ID]float64
-	lastPongReceived map[ID]float64
-}
-
 
 // bucket contains nodes, ordered by their last activity. the entry
 // that was most recently active is the first element in entries.
@@ -64,14 +54,6 @@ type bucket struct {
 	replacements []*Node // recently seen nodes to be used if revalidation fails
 }
 
-func newDB() *DB{
-
-	return &DB{
-		fails: make(map[ID]int),
-		lastPingReceived: make(map[ID]float64),
-		lastPongReceived: make(map[ID]float64),
-	}
-}
 func newTable(net *udp, bootstrapNodes []*Node) *Table {
 	tab := &Table{
 		net:        net,
@@ -80,10 +62,6 @@ func newTable(net *udp, bootstrapNodes []*Node) *Table {
 	}
 
 	tab.nursery = bootstrapNodes
-
-	for i := range tab.buckets {
-		tab.buckets[i] = &bucket{}
-	}
 
 	tab.goOnline()
 
@@ -291,16 +269,19 @@ func (tab *Table) goOffline()  {
 
 	tab.tableRunners = nil
 
+	tab.copyLiveNodes()
+
 }
 
 func (tab *Table) goOnline()  {
 
+	for i := range tab.buckets {
+		tab.buckets[i] = &bucket{}
+	}
+
 	tab.tableRunners = make([]*tableRunner, 0)
 
-
 	tab.seedRand()
-
-	// TODO: izbrisat nodove koji nebi bili spremljeni u bazu
 
 	tab.loadSeedNodes()
 
@@ -381,6 +362,8 @@ func (tab *Table) doRefresh() {
 	//tab.log("table do refresh ")
 	tab.refreshDone.Set(false)
 
+	tab.loadSeedNodes()
+
 	// Run self lookup to discover new neighbor nodes.
 	// We can only do this if we have a secp256k1 identity.
 	tab.lookup(EncodePubKey(tab.self().publicKey), false)
@@ -402,12 +385,16 @@ func (tab *Table) doRefresh() {
 
 
 
+func (tab *Table) copyLiveNodes() {
+	tab.db.lastLiveNodes = tab.getLiveNodes(seedMaxAge)
+}
 
 func (tab *Table) loadSeedNodes() {
-	nodes := tab.nursery
+	nodes := tab.db.QuerySeeds(seedCount)
+	nodes = append(nodes, tab.nursery...)
 	for i := range nodes {
 		seed := nodes[i]
-		tab.log("Load boostrap node: ", seed.Name())
+		//tab.log("Load boostrap node: ", seed.Name())
 		tab.addSeenNode(seed)
 	}
 }
@@ -471,6 +458,8 @@ func (tab *Table) nextRevalidateTime() time.Duration {
 	return time.Duration(tab.rand.Int63n(int64(revalidateInterval)))
 }
 
+
+
 func (tab *Table) Closest(pubKey encPubkey) *nodesByDistance {
 	target := ID(crypto.Keccak256Hash(pubKey[:]))
 	return  tab.closest(target, bucketSize)
@@ -532,7 +521,7 @@ func (tab *Table) addSeenNode(n *Node) {
 	// Add to end of bucket:
 	b.entries = append(b.entries, n)
 	b.replacements = deleteNode(b.replacements, n)
-	n.addedAt = godes.GetSystemTime()
+	n.addedAt[tab.self()] = godes.GetSystemTime()
 }
 
 // addVerifiedNode adds a node whose existence has been verified recently to the front of a
@@ -562,7 +551,7 @@ func (tab *Table) addVerifiedNode(n *Node) {
 	// Add to front of bucket.
 	b.entries, _ = pushNode(b.entries, n, bucketSize)
 	b.replacements = deleteNode(b.replacements, n)
-	n.addedAt = godes.GetSystemTime()
+	n.addedAt[tab.self()] = godes.GetSystemTime()
 }
 
 // delete removes an entry from the node table. It is used to evacuate dead nodes.
@@ -709,25 +698,22 @@ func LogDist(a, b ID) int {
 	return len(a)*8 - lz
 }
 
-func (db *DB) FindFails(n *Node) int {
-	return db.fails[n.ID()]
-}
-func (db *DB) UpdateFindFails(n *Node, fails int)  {
-	db.fails[n.ID()] = fails
-}
 
-func (db *DB) UpdateLastPingReceived(n *Node, time float64)  {
-	db.lastPingReceived[n.ID()] = time
-}
 
-func (db *DB) LastPingReceived(n *Node) float64 {
-	return db.lastPingReceived[n.ID()]
-}
+func (tab *Table) getLiveNodes(maxAge time.Duration) []*Node {
+	nodes := make([]*Node, 0)
+	now := godes.GetSystemTime()
 
-func (db *DB) UpdateLastPongReceived(n *Node, time float64) ()  {
-	db.lastPongReceived[n.ID()] = time
-}
+	for _, b := range &tab.buckets {
+		for _, n := range b.entries {
 
-func (db *DB) LastPongReceived(n *Node) float64 {
-	return db.lastPongReceived[n.ID()]
+			if n.livenessChecks[tab.self()] > 0 &&
+				now - n.addedAt[tab.self()] >= seedMinTableTime.Seconds()  &&
+				now - tab.db.LastPongReceived(n) <= maxAge.Seconds(){
+					nodes = append(nodes, n)
+			}
+		}
+	}
+
+	return nodes
 }

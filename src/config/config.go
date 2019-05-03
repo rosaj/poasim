@@ -34,9 +34,9 @@ type config struct {
 	// latencija slanja poruke preko mreze
 	NetworkLatency distribution
 
-	NetworkUnreliability float64
-
-	LostMessagesDistr distribution
+	//NetworkUnreliability float64
+	//TODO: impl gubljenje paketa ili u obliku distr ili postotka
+	//LostMessagesDistr distribution
 
 	MinerCount int
 
@@ -46,14 +46,16 @@ type config struct {
 }
 
 type logConfig struct {
-
+	// flag da li je globalno logiranje ukljuceno
 	Logging bool
 
+	// da li logirat poruke vezane uz Message tip
 	LogMessages bool
 }
 
 type metricConfig struct {
-
+	// jedinica po kojoj se grupiraju poruke
+	// npr. 60 znaci da se poruke grupiraju po minuti
 	MsgGroupFactor float64
 
 }
@@ -63,7 +65,7 @@ var SimConfig = config {
 
 	SimulationTime: ( 3 * 24 * time.Hour).Seconds(),
 
-	NodeCount: 30,
+	NodeCount: 100,
 
 	NodeStabilisationTime:  12 * time.Hour.Seconds(),
 
@@ -96,7 +98,7 @@ var LogConfig = logConfig {
 
 var MetricConfig  = metricConfig {
 
-	MsgGroupFactor: 5 * 60,
+	MsgGroupFactor: 60,
 
 
 }
@@ -129,6 +131,20 @@ func (config *config) NextNodeIntersessionTime() (interval float64)  {
 	return
 }
 
+func (config *config) NextNodeLifetime() (interval float64) {
+	interval = config.NodeLifetimeDistr.nextValue()
+	//fmt.Println(interval)
+	return
+}
+
+func (config *config) SimulationEnded() bool {
+	return godes.GetSystemTime() >= config.SimulationTime
+}
+
+
+
+
+
 func clampToSimTime(config *config, distr distribution) (interval float64)  {
 	interval = distr.nextValue()
 
@@ -150,14 +166,4 @@ func clampToSimTime(config *config, distr distribution) (interval float64)  {
 	}
 
 	return
-}
-
-func (config *config) NextNodeLifetime() (interval float64) {
-	interval = config.NodeLifetimeDistr.nextValue()
-	//fmt.Println(interval)
-	return
-}
-
-func (config *config) SimulationEnded() bool {
-	return godes.GetSystemTime() >= config.SimulationTime
 }

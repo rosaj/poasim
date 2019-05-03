@@ -41,7 +41,7 @@ type Node struct {
 	//runFunction    RunFunction
 
 	bootstrapNodes []*Node
-	addedAt        float64
+	addedAt        map[*Node]float64
 	livenessChecks map[*Node]uint
 
 	msgSent     map[string][]Msg
@@ -74,6 +74,7 @@ func NewNode(bootstrapNodes []*Node) (n* Node) {
 	n.publicKey = NewKey().PublicKey
 	copy(n.id[:], PublicKeyToId(n.publicKey))
 
+	n.addedAt = make(map[*Node]float64)
 	n.livenessChecks = make(map[*Node]uint)
 	n.msgReceived = make(map[string][]Msg)
 	n.msgSent = make(map[string][]Msg)
@@ -109,18 +110,14 @@ func (n *Node) setOnline(online bool)  {
 
 func (n *Node) MarkMessageSend(m *Message){
 	n.addMsg(m, n.msgSent)
-//	n.msgSent[m.Type] = append(n.msgSent[m.Type], Msg{math.Round(godes.GetSystemTime()), 1})
-	//n.msgSentCount[m.Type] += 1
 }
 func (n *Node) MarkMessageReceived(m *Message){
 	n.addMsg(m, n.msgReceived)
-	//	n.msgReceived[m.Type] = append(n.msgReceived[m.Type], Msg{math.Round(godes.GetSystemTime()), 1})
-	//n.msgReceivedCount[m.Type] += 1
 }
 
 func (n *Node) addMsg(msg *Message, msgMap map[string][]Msg)  {
 	t := math.Round(godes.GetSystemTime()/ config.MetricConfig.MsgGroupFactor)
-
+	//TODO: msg size
 	msgMap[msg.Type] = append(msgMap[msg.Type], Msg{t, 1})
 }
 /*

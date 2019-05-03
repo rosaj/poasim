@@ -106,7 +106,7 @@ func waitForSimEnd(startTime sysTime.Time)  {
 
 			initialPct := math.Floor((godes.GetSystemTime()/config.SimConfig.SimulationTime)*100)/100
 
-			chunks := 100
+			chunks := 2
 			part := dif / float64(chunks)
 
 			for i := 1; i <= chunks; i++ {
@@ -121,9 +121,7 @@ func waitForSimEnd(startTime sysTime.Time)  {
 
 				util.Log(percentage, "%: elapsed:", elapsed)
 
-				if percentage < 98 {
-					config.LogConfig.Logging = false
-				}
+				config.LogConfig.Logging = false
 			}
 		}
 	}
@@ -132,14 +130,16 @@ func waitForSimEnd(startTime sysTime.Time)  {
 
 func showStats(nodes []*network.Node)  {
 
-	sum := 0
+	totalSent := 0
+	totalReceived := 0
 	for _, node := range nodes {
-		totalSent := node.GetTotalMessagesSent()
-		sum += totalSent
+		totalSent += node.GetTotalMessagesSent()
+		totalReceived += node.GetTotalMessagesReceived()
 	}
 
-	fmt.Println("Sum sent", sum)
-	fmt.Println("Average sent", sum/len(nodes))
+	fmt.Println("Sent [sum:", totalSent,"avg:", totalSent/len(nodes))
+	fmt.Println("Received [sum:", totalReceived,"avg:", totalReceived/len(nodes))
+
 	plot.Stats(nodes)
 }
 
