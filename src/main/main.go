@@ -13,6 +13,7 @@ import (
 )
 
 
+var startTime sysTime.Time
 
 
 func runBootstrapNodes() []*network.Node {
@@ -59,26 +60,34 @@ func runNodes() []*network.Node {
 		}
 
 		godes.AddRunner(nodes[i])
-		fmt.Println(math.Round(godes.GetSystemTime()/config.SimConfig.SimulationTime), "% - Added node:", nodes[i])
+
+		logProgress("Added node:", nodes[i])
 	}
 
-	fmt.Println("Added all nodes")
+	logProgress("Added all nodes")
+
 	return append(nodes, bNodes...)
+}
+
+func logProgress(a ...interface{})  {
+	logging := config.LogConfig.Logging
+	config.LogConfig.Logging = true
+
+	util.Log(math.Round((godes.GetSystemTime()/config.SimConfig.SimulationTime)*100), "% elapsed:", sysTime.Since(startTime), a)
+
+	config.LogConfig.Logging = logging
 }
 
 func runSim(){
 
 	runtime.GOMAXPROCS(1)
 
-	startTime:= sysTime.Now()
-
+	startTime = sysTime.Now()
 	util.Log("start")
-
 
 	nodes := runNodes()
 
-
-	waitForSimEnd(startTime)
+	waitForSimEnd()
 
 	if godes.GetSystemTime() > config.SimConfig.SimulationTime {
 		config.SimConfig.SimulationTime = godes.GetSystemTime()
@@ -86,8 +95,7 @@ func runSim(){
 
 	config.LogConfig.Logging = true
 
-	elapsed := sysTime.Since(startTime)
-	util.Log("Simulation end after:", elapsed)
+	util.Log("Simulation end after:", sysTime.Since(startTime))
 
 	godes.Clear()
 
@@ -95,7 +103,7 @@ func runSim(){
 
 }
 
-func waitForSimEnd(startTime sysTime.Time)  {
+func waitForSimEnd()  {
 	dif := config.SimConfig.SimulationTime - godes.GetSystemTime()
 
 	if dif > 0 {
@@ -104,24 +112,12 @@ func waitForSimEnd(startTime sysTime.Time)  {
 			godes.Advance(dif)
 		} else {
 
-			initialPct := math.Floor((godes.GetSystemTime()/config.SimConfig.SimulationTime)*100)/100
-
-			chunks := 2
+			chunks := 50
 			part := dif / float64(chunks)
 
 			for i := 1; i <= chunks; i++ {
 				godes.Advance(part)
-
-				config.LogConfig.Logging = true
-
-				elapsed := sysTime.Since(startTime)
-
-				percentage := math.Round( ( initialPct + (float64(i)*part)/config.SimConfig.SimulationTime)  * 100)
-				//percentage := math.Floor((((float64(i)*part)/dif )/(1-initialPct) - initialPct ) *100)
-
-				util.Log(percentage, "%: elapsed:", elapsed)
-
-				config.LogConfig.Logging = false
+				logProgress()
 			}
 		}
 	}
@@ -137,8 +133,8 @@ func showStats(nodes []*network.Node)  {
 		totalReceived += node.GetTotalMessagesReceived()
 	}
 
-	fmt.Println("Sent [sum:", totalSent,"avg:", totalSent/len(nodes))
-	fmt.Println("Received [sum:", totalReceived,"avg:", totalReceived/len(nodes))
+	fmt.Println("Sent [sum:", totalSent,"avg:", totalSent/len(nodes), "]")
+	fmt.Println("Received [sum:", totalReceived,"avg:", totalReceived/len(nodes), "]")
 
 	plot.Stats(nodes)
 }

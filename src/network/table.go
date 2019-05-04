@@ -42,7 +42,6 @@ type Table struct {
 
 	refreshDone godes.BooleanControl
 
-
 	tableRunners []*tableRunner
 
 }
@@ -205,9 +204,9 @@ func (tab *Table) findnode(n *Node, targetKey encPubkey, onResponse func(nodes *
 		if err == errMsgTimeout {
 			fails++
 			tab.db.UpdateFindFails(n, fails)
-		//	log.Trace("Findnode failed", "id", n.ID(), "failcount", fails, "err", err)
+			tab.log("Findnode failed", "id", n, "failcount", fails, "err", err)
 			if fails >= maxFindnodeFailures {
-		//		log.Trace("Too many findnode failures, dropping", "id", n.ID(), "failcount", fails)
+				tab.log("Too many findnode failures, dropping", "id", n, "failcount", fails)
 				tab.delete(n)
 			}
 		} else if fails > 0 {
@@ -241,14 +240,12 @@ func (tab *Table) refresh() {
 // loop schedules refresh, revalidate runs and coordinates shutdown.
 func (tab *Table) loop() {
 //	tab.log("table loop")
+
 	// Start initial refresh.
-	// go
 	tab.doRefresh()
 
-	// go
 	tab.startRefreshing()
 
-	// go
 	tab.startRevalidateing()
 
 }
@@ -285,7 +282,6 @@ func (tab *Table) goOnline()  {
 
 	tab.loadSeedNodes()
 
-	// go
 	tab.loop()
 }
 
@@ -312,22 +308,25 @@ type refreshRunner struct {
 }
 
 func (r *refreshRunner) Run()  {
+	refreshTime := refreshInterval.Seconds()
+	tab := r.tab
 	for{
-		godes.Advance(refreshInterval.Seconds())
+		godes.Advance(refreshTime)
 
 		if r.stopped {
 			return
 		}
-		//r.tab.log("table start refresh after ", float64(refreshInterval.Seconds()))
-		r.tab.seedRand()
-		r.tab.refresh()
+
+		tab.doRefresh()
 	}
 
 }
 
+
 func (tab *Table) startRefreshing()  {
 	godes.AddRunner(&refreshRunner{tab.newTableRunner()})
 }
+
 
 type revalidateRunner struct {
 	*tableRunner
@@ -353,6 +352,9 @@ func (r *revalidateRunner) Run()  {
 func (tab *Table) startRevalidateing()  {
 	godes.AddRunner(&revalidateRunner{tab.newTableRunner()})
 }
+
+
+
 
 // doRefresh performs a lookup for a random target to keep buckets
 // full. seed nodes are inserted if the table is empty (initial

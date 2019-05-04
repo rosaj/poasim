@@ -18,9 +18,11 @@ func Log(a ...interface{}){
 }
 
 func ToDuration(seconds float64)  time.Duration {
-
+	/*
 	t := time.Now()
 	t1 := t.Add(time.Second * time.Duration(seconds))
 	dif := t1.Sub(t)
-	return dif
+	 */
+
+	return time.Duration(seconds) * time.Second
 }

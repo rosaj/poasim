@@ -16,6 +16,12 @@ var (
 	errPacketLost		   = errors.New("packet lost")
 )
 
+var (
+	PING		= "PING"
+	PONG		= "PONG"
+	FINDNODE	= "FINDNODE"
+	NEIGHBORS	= "NEIGHBORS"
+)
 
 
 type Message struct {
@@ -166,6 +172,6 @@ func (m *Message) logReceived() {
 
 func (m *Message) logError(err error) {
 	if config.LogConfig.LogMessages {
-		util.Log("Message", m, "- error:",err, "in", m.responseTimeout, "sec, Sender online:",m.From.IsOnline(), "Receiver online:", m.To.IsOnline())
+		util.Log("Message", m, "- error:",err, "in", m.responseTimeout, "sec, Sender online:", m.From.IsOnline(), "Receiver online:", m.To.IsOnline())
 	}
 }

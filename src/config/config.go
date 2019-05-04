@@ -63,15 +63,15 @@ type metricConfig struct {
 
 var SimConfig = config {
 
-	SimulationTime: ( 3 * 24 * time.Hour).Seconds(),
+	SimulationTime: (3 * time.Hour).Seconds(),
 
-	NodeCount: 100,
+	NodeCount: 10000,
 
-	NodeStabilisationTime:  12 * time.Hour.Seconds(),
+	NodeStabilisationTime:  30 * time.Minute.Seconds(),
 
 	ChurnEnabled: true,
 
-	NodeArrivalDistr: NewNormalDistr(1*time.Minute.Seconds(), 0),
+	NodeArrivalDistr: NewNormalDistr((80*time.Minute.Seconds())/10000, 0),
 
 	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Hour).Seconds())),
 

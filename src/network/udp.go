@@ -270,7 +270,7 @@ func getExpirationTime() float64  {
 }
 
 func newPingMessage(from *Node, to *Node, onResponse func(m *Message, err error)) (m *Message) {
-	m = newMessage(from, to, "PING", "ping", getExpirationTime(),
+	m = newMessage(from, to, PING, PING, getExpirationTime(),
 		func() {
 			p := &ping{m}
 			handlePacket(p)
@@ -281,7 +281,7 @@ func newPingMessage(from *Node, to *Node, onResponse func(m *Message, err error)
 }
 
 func newPongMessage(from *Node, to *Node, responseTo *Message) (m *Message)  {
-	m = newMessage(from, to, "PONG", "pong", getExpirationTime(),
+	m = newMessage(from, to, PONG, PONG, getExpirationTime(),
 		func() {
 			p := &pong{m}
 			handlePacket(p)
@@ -293,7 +293,7 @@ func newPongMessage(from *Node, to *Node, responseTo *Message) (m *Message)  {
 
 
 func newFindNodeMessage(from *Node, to *Node, pubkey encPubkey, onResponse func(m *Message, err error)) (m *Message)  {
-	m = newMessage(from, to, "FINDNODE", pubkey,getExpirationTime(),
+	m = newMessage(from, to, FINDNODE, pubkey,getExpirationTime(),
 		func() {
 			p := &findnode{m}
 			handlePacket(p)
@@ -304,7 +304,7 @@ func newFindNodeMessage(from *Node, to *Node, pubkey encPubkey, onResponse func(
 }
 
 func newNeighborsMessage(from *Node, to *Node, nodes *nodesByDistance, responseToMsg *Message) (m *Message)  {
-	m = newMessage(from, to, "NEIGHBORS", nodes,getExpirationTime(),
+	m = newMessage(from, to, NEIGHBORS, nodes,getExpirationTime(),
 		func() {
 			p := &neighbors{m}
 			handlePacket(p)
