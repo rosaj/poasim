@@ -15,14 +15,14 @@ func NewKey() *ecdsa.PrivateKey {
 }
 
 
-func PublicKeyToId(pubKey ecdsa.PublicKey) []byte {
+func PublicKeyToId(pubKey *ecdsa.PublicKey) []byte {
 	buf := make([]byte, 64)
 	math.ReadBits(pubKey.X, buf[:32])
 	math.ReadBits(pubKey.Y, buf[32:])
 	return crypto.Keccak256(buf)
 }
 
-func EncodePubKey(key ecdsa.PublicKey) encPubkey {
+func EncodePubKey(key *ecdsa.PublicKey) encPubkey {
 	var e encPubkey
 	math.ReadBits(key.X, e[:len(e)/2])
 	math.ReadBits(key.Y, e[len(e)/2:])

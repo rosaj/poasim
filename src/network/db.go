@@ -1,6 +1,7 @@
 package network
 
 import (
+	"../config"
 	"../util"
 	"bytes"
 	crand "crypto/rand"
@@ -104,7 +105,11 @@ seek:
 		nodes = append(nodes, n)
 	}
 
-	util.Log("Queryed", len(nodes), "from", len(db.lastLiveNodes))
+
+	if config.LogConfig.LogDiscovery {
+		util.Log("Queryed", len(nodes), "from", len(db.lastLiveNodes))
+	}
+
 	db.lastLiveNodes = nil
 	return nodes
 

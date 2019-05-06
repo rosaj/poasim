@@ -1,6 +1,7 @@
 package network
 
 import (
+	"../config"
 	"../util"
 	crand "crypto/rand"
 	"encoding/binary"
@@ -44,6 +45,7 @@ type Table struct {
 
 	tableRunners []*tableRunner
 
+	nodeStat map[float64]int
 }
 
 // bucket contains nodes, ordered by their last activity. the entry
@@ -58,6 +60,7 @@ func newTable(net *udp, bootstrapNodes []*Node) *Table {
 		net:        net,
 		db:			net.db,
 		rand:       mrand.New(mrand.NewSource(0)),
+		nodeStat:	make(map[float64]int),
 	}
 
 	tab.nursery = bootstrapNodes
@@ -68,7 +71,9 @@ func newTable(net *udp, bootstrapNodes []*Node) *Table {
 }
 
 func (tab *Table) log(s ...interface{})  {
-	util.Log(tab.self().Name(), s)
+	if config.LogConfig.LogDiscovery {
+		util.Log(tab.self().Name(), s)
+	}
 }
 
 func (tab *Table) self() *Node {
@@ -118,18 +123,51 @@ func (tab *Table) ReadRandomNodes(buf []*Node) (n int) {
 
 
 
+
+// Resolve searches for a specific node with the given ID.
+// It returns nil if the node could not be found.
+func (tab *Table) Resolve(n *Node) *Node {
+	// If the node is present in the local table, no
+	// network interaction is required.
+	hash := n.ID()
+	cl := tab.closest(hash, 1)
+
+	if len(cl.entries) > 0 && cl.entries[0].ID() == hash {
+		return cl.entries[0]
+	}
+	// Otherwise, do a network lookup.
+	result := tab.lookup(EncodePubKey(n.PublicKey()), true)
+	for _, n := range result {
+		if n.ID() == hash {
+			return n
+		}
+	}
+	return nil
+}
+
+// LookupRandom finds random nodes in the network.
+func (tab *Table) LookupRandom() []*Node{
+	var target encPubkey
+	crand.Read(target[:])
+
+	return 	tab.lookup(target, true)
+}
+
+
 // lookup performs a network search for nodes close to the given target. It approaches the
 // target by querying nodes that are closer to it on each iteration. The given target does
 // not need to be an actual node identifier.
+
+// waits for the all the lookups to end before returning the results
 func (tab *Table) lookup(targetKey encPubkey, refreshIfEmpty bool) []*Node {
 	//tab.log("lookup ", refreshIfEmpty)
 	var (
 		target         = ID(crypto.Keccak256Hash(targetKey[:]))
 		asked          = make(map[ID]bool)
 		seen           = make(map[ID]bool)
-	//	reply          = make(chan []*Node, alpha)
 		pendingQueries = 0
 		result         *nodesByDistance
+		lookupDone	   = godes.NewBooleanControl()
 	)
 	// don't query further if we hit ourself.
 	// unlikely to happen often in practice.
@@ -148,14 +186,14 @@ func (tab *Table) lookup(targetKey encPubkey, refreshIfEmpty bool) []*Node {
 	}
 
 
+	tab.lookupNode(&pendingQueries, result, asked, seen, targetKey, lookupDone)
 
-	tab.lookupNode(&pendingQueries, result, asked, seen, targetKey)
-
+	lookupDone.Wait(true)
 
 	return result.entries
 }
 
-func (tab *Table) lookupNode(pendingQueries *int, result *nodesByDistance, asked map[ID]bool, seen map[ID]bool, targetKey encPubkey)  {
+func (tab *Table) lookupNode(pendingQueries *int, result *nodesByDistance, asked map[ID]bool, seen map[ID]bool, targetKey encPubkey, lookupDone *godes.BooleanControl)  {
 
 	// ask the alpha closest nodes that we haven't asked yet
 	// when a node responds, ask another node if we can
@@ -170,7 +208,6 @@ func (tab *Table) lookupNode(pendingQueries *int, result *nodesByDistance, asked
 			*pendingQueries++
 
 		//	tab.log("lookup-findnode ", targetKey)
-			// go
 			tab.findnode(n, targetKey, func(nodesByDist *nodesByDistance, err error) {
 				if nodesByDist != nil {
 
@@ -184,11 +221,15 @@ func (tab *Table) lookupNode(pendingQueries *int, result *nodesByDistance, asked
 				}
 				*pendingQueries--
 
-				tab.lookupNode(pendingQueries, result, asked, seen, targetKey)
+				tab.lookupNode(pendingQueries, result, asked, seen, targetKey, lookupDone)
 			})
 		}
 	}
 
+	if *pendingQueries == 0 {
+		lookupDone.Set(true)
+		tab.logNodes()
+	}
 
 }
 
@@ -247,8 +288,12 @@ func (tab *Table) loop() {
 	tab.startRefreshing()
 
 	tab.startRevalidateing()
-
 }
+
+func (tab *Table) Close()  {
+	tab.SetOnline(false)
+}
+
 func (tab *Table) SetOnline(online bool)  {
 
 	if !online{
@@ -259,6 +304,7 @@ func (tab *Table) SetOnline(online bool)  {
 
 }
 func (tab *Table) goOffline()  {
+
 
 	for _, tr := range tab.tableRunners {
 		tr.stop()
@@ -275,6 +321,7 @@ func (tab *Table) goOnline()  {
 	for i := range tab.buckets {
 		tab.buckets[i] = &bucket{}
 	}
+	tab.self().livenessChecks = make(map[*Node]uint)
 
 	tab.tableRunners = make([]*tableRunner, 0)
 
@@ -360,6 +407,7 @@ func (tab *Table) startRevalidateing()  {
 // full. seed nodes are inserted if the table is empty (initial
 // bootstrap or discarded faulty peers).
 func (tab *Table) doRefresh() {
+	tab.logNodes()
 
 	//tab.log("table do refresh ")
 	tab.refreshDone.Set(false)
@@ -420,9 +468,14 @@ func (tab *Table) doRevalidate() {
 
 	tab.self().sendPingPackage(last, func(m *Message, err error) {
 	//	tab.log("ping respond, ", m)
+		if err == errNodeOffline {
+			util.LogError(errNodeOffline)
+			return
+		}
+
 		b := tab.buckets[bi]
 		// if the response is received withing the timeout time
-		if err == nil || err != errMsgTimeout {
+		if err == nil {
 			// The node responded, move it to the front.
 			last.livenessChecks[tab.self()]++
 			tab.log("Revalidated node", "b", bi, "id", last, "checks", last.livenessChecks[tab.self()])
@@ -519,7 +572,7 @@ func (tab *Table) addSeenNode(n *Node) {
 		return
 	}
 
-	tab.log("addSeenNode: ", n.Name())
+//	tab.log("addSeenNode: ", n.Name())
 	// Add to end of bucket:
 	b.entries = append(b.entries, n)
 	b.replacements = deleteNode(b.replacements, n)
@@ -568,7 +621,7 @@ func (tab *Table) addReplacement(b *bucket, n *Node) {
 		}
 	}
 
-	tab.log("addReplacement: ", n.Name())
+	//tab.log("addReplacement: ", n.Name())
 	var _ *Node
 	b.replacements, _ = pushNode(b.replacements, n, maxReplacements)
 }
@@ -718,4 +771,25 @@ func (tab *Table) getLiveNodes(maxAge time.Duration) []*Node {
 	}
 
 	return nodes
+}
+
+func (tab *Table) logNodes()  {
+	count := 0
+
+	for _, b := range &tab.buckets {
+		for _, n := range b.entries {
+
+			if n.livenessChecks[tab.self()] > 0 {
+				count += 1
+			}
+		}
+	}
+
+	tab.nodeStat[config.MetricConfig.GetTimeGroup()] = count
+	/*
+	config.LogConfig.Logging = true
+	tab.log(config.MetricConfig.GetTimeGroup(),  count)
+	config.LogConfig.Logging = false
+	 */
+
 }

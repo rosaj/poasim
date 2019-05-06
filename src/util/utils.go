@@ -13,7 +13,10 @@ func Log(a ...interface{}){
 	if !config.LogConfig.Logging {
 		return
 	}
+	Print(a)
+}
 
+func Print(a ...interface{})  {
 	fmt.Println(ToDuration(godes.GetSystemTime()), a)
 }
 
@@ -25,4 +28,7 @@ func ToDuration(seconds float64)  time.Duration {
 	 */
 
 	return time.Duration(seconds) * time.Second
+}
+func LogError(err error) {
+	Print(err)
 }

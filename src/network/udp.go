@@ -76,12 +76,12 @@ type udp struct {
 }
 
 
-func newUDP(node *Node, bootstrapNodes []*Node) (*Table, *udp) {
+func newUDP(node *Node) (*Table, *udp) {
 	udp := &udp{
 		node:       	 node,
 		db:              newDB(),
 	}
-	tab := newTable(udp, bootstrapNodes)
+	tab := newTable(udp, node.bootstrapNodes)
 	udp.tab = tab
 
 	return udp.tab, udp

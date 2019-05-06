@@ -21,6 +21,10 @@ var (
 	PONG		= "PONG"
 	FINDNODE	= "FINDNODE"
 	NEIGHBORS	= "NEIGHBORS"
+
+
+	DEVP2P_PING	= "DEVP2P_PING"
+	DEVP2P_PONG	= "DEVP2P_PING"
 )
 
 
@@ -62,7 +66,7 @@ func (m *Message) Run() {
 
 		m.To.MarkMessageReceived(m)
 	} else {
-		m.handleError(errTimeout)
+		m.handleError(errMsgTimeout)
 		m.Type = "RECIEVE_ERR"
 		m.To.MarkMessageReceived(m)
 

@@ -33,9 +33,8 @@ func runBootstrapNodes() []*network.Node {
 	return bootstrapNodes
 }
 
-func createNodes(bootstrapNodes []*network.Node) []*network.Node  {
-
-	nodes := make([]*network.Node, config.SimConfig.NodeCount)
+func createNodes(bootstrapNodes []*network.Node, count int) []*network.Node {
+	nodes := make([]*network.Node, count)
 
 	for i:=0 ; i < len(nodes); i++ {
 		nodes[i] = network.NewNode(bootstrapNodes)
@@ -44,11 +43,15 @@ func createNodes(bootstrapNodes []*network.Node) []*network.Node  {
 	return nodes
 }
 
+func createSimNodes(bootstrapNodes []*network.Node) []*network.Node  {
+	return createNodes(bootstrapNodes, config.SimConfig.NodeCount)
+}
+
 func runNodes() []*network.Node {
 
 	bNodes := runBootstrapNodes()
 
-	nodes := createNodes(bNodes)
+	nodes := createSimNodes(bNodes)
 
 
 	for i:= 0; i < len(nodes) ; i++ {
@@ -70,12 +73,7 @@ func runNodes() []*network.Node {
 }
 
 func logProgress(a ...interface{})  {
-	logging := config.LogConfig.Logging
-	config.LogConfig.Logging = true
-
-	util.Log(math.Round((godes.GetSystemTime()/config.SimConfig.SimulationTime)*100), "% elapsed:", sysTime.Since(startTime), a)
-
-	config.LogConfig.Logging = logging
+	util.Print(math.Round((godes.GetSystemTime()/config.SimConfig.SimulationTime)*100), "% elapsed:", sysTime.Since(startTime), a)
 }
 
 func runSim(){
@@ -86,6 +84,40 @@ func runSim(){
 	util.Log("start")
 
 	nodes := runNodes()
+
+	/*
+
+
+	godes.Advance(config.SimConfig.NodeStabilisationTime)
+
+	deadNodes := 500
+	temp := nodes[:deadNodes]
+
+	for _, node := range temp {
+		node.Kill()
+	}
+
+	godes.Advance(config.SimConfig.NodeStabilisationTime)
+	temp = nodes[deadNodes+1:800]
+
+	for _, node := range temp {
+		node.Kill()
+	}
+
+	godes.Advance(config.SimConfig.NodeStabilisationTime)
+
+
+
+	temp = createNodes(nodes[config.SimConfig.NodeCount:], deadNodes)
+	for _, node := range temp {
+		godes.AddRunner(node)
+		logProgress("Added new node:", node)
+	}
+	nodes = append(nodes, temp...)
+
+
+*/
+
 
 	waitForSimEnd()
 

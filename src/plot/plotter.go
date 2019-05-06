@@ -5,6 +5,7 @@ import (
 	"../network"
 	"../util"
 	"fmt"
+	"github.com/agoussia/godes"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/plotutil"
@@ -14,6 +15,29 @@ import (
 	"sort"
 	"strconv"
 )
+
+func addPoints(vals map[float64]float64, key string, ptss map[string]plotter.XYs)  {
+
+	// To store the keys in slice in sorted order
+	var keys []float64
+	for k := range vals {
+		keys = append(keys, k)
+	}
+	sort.Float64s(keys)
+
+	pts := make(plotter.XYs, len(vals))
+
+	y := 0
+
+	for _, key := range keys {
+
+		pts[y].X = key
+		pts[y].Y = vals[key]
+		y+=1
+		//fmt.Println(key, value)
+	}
+	ptss[key] = pts
+}
 
 
 func Stats(nodes []*network.Node)  {
@@ -32,6 +56,7 @@ func Stats(nodes []*network.Node)  {
 			all[key+"_RECEIVED"] = append(all[key+"_RECEIVED"], val...)
 			all["ALL_RECEIVED"] = append(all["ALL_RECEIVED"], val...)
 		}
+
 	}
 
 	fmt.Println("All msg gathered")
@@ -46,7 +71,7 @@ func Stats(nodes []*network.Node)  {
 		util.ToDuration(config.MetricConfig.MsgGroupFactor).String())
 
 	p.X.Label.Text = "Time"
-	p.Y.Label.Text = "Message count"
+	p.Y.Label.Text = "Count"
 
 
 	ptss := make(map[string]plotter.XYs)
@@ -58,42 +83,66 @@ func Stats(nodes []*network.Node)  {
 		for _, val := range value {
 			vals[val.Time] += 1
 		}
-
-		// To store the keys in slice in sorted order
-		var keys []float64
-		for k := range vals {
-			keys = append(keys, k)
-		}
-		sort.Float64s(keys)
-
-		pts := make(plotter.XYs, len(vals))
-
-		y := 0
-
-		for _, key := range keys {
-
-			pts[y].X = key
-			pts[y].Y = vals[key]
-			y+=1
-			//fmt.Println(key, value)
-		}
-		ptss[key] = pts
+		addPoints(vals, key, ptss)
 
 	}
+
+
+	tStats := make(map[float64][]float64)
+
+	for _, node := range nodes {
+		tableStats := node.GetTableStats()
+		for k, v := range tableStats {
+			tStats[k] = append(tStats[k], float64(v))
+		}
+	}
+
+
+	vals := make(map[float64]float64)
+	for k,v := range tStats {
+		vals[k] = godes.Mean(v)
+	}
+
+	addPoints(vals, "TABLE", ptss)
+
+
+
+
+	nStats := network.GetNodeStats()
+
+	vals = make(map[float64]float64)
+	for k,v := range nStats {
+		sum := 0
+		for _, v := range v {
+			sum += v
+		}
+
+		if sum > 0 {
+			vals[k] = float64(sum) / float64(len(v))
+		}
+	}
+
+	addPoints(vals, "NODES", ptss)
+
 
 	fmt.Println("Points prepared")
 
 	err = plotutil.AddLines(p,
 		"Ping", ptss["PING"],
 		"Pong", ptss["PONG"],
-		"FindNode", ptss["FINDNODE"],
-		"Neighbors", ptss["NEIGHBORS"],
-		"SEND_ERR", ptss["SEND_ERR"],
-		"Ping_Received", ptss["PING_RECEIVED"],
-		"Pong_Received", ptss["PONG_RECEIVED"],
-		"FindNode_Received", ptss["FINDNODE_RECEIVED"],
-		"Neighbors_Received", ptss["NEIGHBORS_RECEIVED"],
-		"RECIEVE_ERR", ptss["RECIEVE_ERR"])
+//		"FindNode", ptss["FINDNODE"],
+//		"Neighbors", ptss["NEIGHBORS"],
+//		"SEND_ERR", ptss["SEND_ERR"],
+//		"Ping_Received", ptss["PING_RECEIVED"],
+//		"Pong_Received", ptss["PONG_RECEIVED"],
+//		"FindNode_Received", ptss["FINDNODE_RECEIVED"],
+//		"Neighbors_Received", ptss["NEIGHBORS_RECEIVED"],
+//		"RECIEVE_ERR", ptss["RECIEVE_ERR"],
+		"TABLE", ptss["TABLE"],
+		"Nodes", ptss["NODES"],
+		network.DEVP2P_PING, ptss[network.DEVP2P_PING],
+		network.DEVP2P_PONG, ptss[network.DEVP2P_PONG],
+		)
 
 	if err != nil {
 		panic(err)

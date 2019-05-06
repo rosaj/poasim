@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/agoussia/godes"
+	"math"
 	"time"
 )
 
@@ -38,6 +39,8 @@ type config struct {
 	//TODO: impl gubljenje paketa ili u obliku distr ili postotka
 	//LostMessagesDistr distribution
 
+	MaxPeers int
+
 	MinerCount int
 
 	BlockTime float64
@@ -51,6 +54,14 @@ type logConfig struct {
 
 	// da li logirat poruke vezane uz Message tip
 	LogMessages bool
+
+	LogNode	bool
+
+	LogDiscovery bool
+
+
+	LogServer bool
+
 }
 
 type metricConfig struct {
@@ -65,13 +76,13 @@ var SimConfig = config {
 
 	SimulationTime: (3 * time.Hour).Seconds(),
 
-	NodeCount: 10000,
+	NodeCount: 100,
 
 	NodeStabilisationTime:  30 * time.Minute.Seconds(),
 
 	ChurnEnabled: true,
 
-	NodeArrivalDistr: NewNormalDistr((80*time.Minute.Seconds())/10000, 0),
+	NodeArrivalDistr: NewNormalDistr((80*time.Minute.Seconds())/100, 0),
 
 	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Hour).Seconds())),
 
@@ -80,6 +91,8 @@ var SimConfig = config {
 	NodeLifetimeDistr: NewExpDistr(1 / (111115 * time.Hour.Seconds())),
 
 	NetworkLatency:  NewLogNormalDistr(.209,.157),// u metodi NextNetworkLatency dodano /10
+
+	MaxPeers: 25,
 
 	MinerCount: 6,
 
@@ -94,6 +107,12 @@ var LogConfig = logConfig {
 	Logging: false,
 
 	LogMessages: false,
+
+	LogNode: false,
+
+	LogDiscovery: false,
+
+	LogServer: false,
 }
 
 var MetricConfig  = metricConfig {
@@ -166,4 +185,8 @@ func clampToSimTime(config *config, distr distribution) (interval float64)  {
 	}
 
 	return
+}
+
+func (metricConfig *metricConfig) GetTimeGroup() float64 {
+	return	math.Round(godes.GetSystemTime()/ metricConfig.MsgGroupFactor)
 }

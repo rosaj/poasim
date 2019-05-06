@@ -9,13 +9,29 @@ import (
 	"strconv"
 )
 
-type INode interface {
-	HasMessage()
-	AddMessage()
-	Run()
+
+var onlineCounter = 0
+
+var nodeStats = make(map[float64][]int)
+
+func GetNodeStats() map[float64][]int {
+	return nodeStats
 }
 
-type RunFunction func(*Node)
+func nodeCountChanged(arrival bool)  {
+	if arrival {
+		onlineCounter += 1
+	} else {
+		onlineCounter -= 1
+	}
+
+	t := config.MetricConfig.GetTimeGroup()
+	nodeStats[t] = append(nodeStats[t], onlineCounter)
+
+}
+
+
+
 // ID is a unique identifier for each node.
 type ID [32]byte
 
@@ -25,20 +41,19 @@ type encPubkey [64]byte
 type Node struct {
 	*godes.Runner
 
-	name string
-	online      bool
-	lifetime 	float64
+	name            string
+	online          bool
+	lifetime        float64
 	isBootstrapNode bool
 
-	publicKey ecdsa.PublicKey
+	publicKey *ecdsa.PublicKey
 
 	id ID
 
-	udp   *udp
-	tab   *Table
-	queue *godes.FIFOQueue
+	udp   	*udp
+	tab   	*Table
+	server	*Server
 
-	//runFunction    RunFunction
 
 	bootstrapNodes []*Node
 	addedAt        map[*Node]float64
@@ -46,6 +61,7 @@ type Node struct {
 
 	msgSent     map[string][]Msg
 	msgReceived map[string][]Msg
+
 }
 
 type Msg struct {
@@ -71,7 +87,7 @@ func NewNode(bootstrapNodes []*Node) (n* Node) {
 	n.lifetime = config.SimConfig.NextNodeLifetime()
 	n.isBootstrapNode = false
 
-	n.publicKey = NewKey().PublicKey
+	n.publicKey = &NewKey().PublicKey
 	copy(n.id[:], PublicKeyToId(n.publicKey))
 
 	n.addedAt = make(map[*Node]float64)
@@ -90,7 +106,7 @@ func NewNode(bootstrapNodes []*Node) (n* Node) {
 func (n *Node) Name() string {
 	return n.name
 }
-func (n *Node) PublicKey() ecdsa.PublicKey{
+func (n *Node) PublicKey() *ecdsa.PublicKey{
 	return n.publicKey
 }
 
@@ -101,11 +117,21 @@ func (n *Node) ID() ID {
 func (n *Node) IsOnline() bool {
 	return n.online
 }
+func (n *Node) Kill()  {
+	n.setOnline(false)
+	godes.Interrupt(n)
+}
+
+func (n *Node) GetTableStats() map[float64]int {
+	return n.tab.nodeStat
+}
 
 func (n *Node) setOnline(online bool)  {
 	n.online = online
 	n.tab.SetOnline(online)
-	util.Log(n, "online:", online)
+	n.log("online:", online)
+
+	nodeCountChanged(online)
 }
 
 func (n *Node) MarkMessageSend(m *Message){
@@ -116,7 +142,7 @@ func (n *Node) MarkMessageReceived(m *Message){
 }
 
 func (n *Node) addMsg(msg *Message, msgMap map[string][]Msg)  {
-	t := math.Round(godes.GetSystemTime()/ config.MetricConfig.MsgGroupFactor)
+	t := config.MetricConfig.GetTimeGroup()
 	//TODO: msg size
 	msgMap[msg.Type] = append(msgMap[msg.Type], Msg{t, 1})
 }
@@ -156,8 +182,13 @@ func mapSum(data map[string][]Msg) int {
 }
 
 func (n *Node) startP2P()  {
-	n.tab, n.udp = newUDP(n, n.bootstrapNodes)
-	util.Log(n, "P2P running")
+	n.tab, n.udp = newUDP(n)
+	n.log("P2P running")
+}
+
+func (n *Node) startServer()  {
+	n.server = NewServer(n)
+	n.server.Start()
 }
 
 func (n *Node) doChurn()  {
@@ -216,14 +247,19 @@ func (n *Node) waitForEnd()  {
 		}
 	}
 
-	util.Log("Node", n, "ended")
+	n.log("Ended")
 }
 
 func (n *Node) Run() {
-	util.Log("Starting node ", n)
+	n.log("Starting node")
 
 	// kad se pokrene p2p ovdje je i dalje godes vrijeme 0
 	n.startP2P()
+
+
+	n.startServer()
+
+	nodeCountChanged(true)
 
 	n.waitForEnd()
 
@@ -234,3 +270,10 @@ func (n *Node) String() string {
 	return n.Name()
 }
 
+func (n *Node) log(a ...interface{})  {
+
+	if config.LogConfig.LogNode {
+		util.Log(n, a)
+	}
+
+}
