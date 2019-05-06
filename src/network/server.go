@@ -7,8 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/agoussia/godes"
-	"github.com/ethereum/go-ethereum/p2p"
-
 )
 
 const (
@@ -53,10 +51,10 @@ type Config struct {
 	// Protocols should contain the protocols supported
 	// by the server. Matching protocols are launched for
 	// each peer.
-	Protocols []p2p.Protocol `toml:"-"`
+	Protocols []Protocol
 
 	// If NoDial is true, the server will not dial any peers.
-	NoDial bool `toml:",omitempty"`
+	NoDial bool
 
 }
 
@@ -75,14 +73,16 @@ type Server struct {
 	peers       	map[ID]*Peer
 	inboundCount	int
 
-
 	refreshFunc 	func()
 
+
+	pm				*ProtocolManager
 }
 
 
 
 func NewServer(node *Node) *Server {
+
 	return &Server{
 		node: node,
 		peers: make(map[ID]*Peer),
@@ -301,6 +301,10 @@ func (srv *Server) addPeer(peer *Peer) error {
 }
 
 func (srv *Server) DeletePeer(p *Peer)  {
+
+	if srv.peers[p.ID()] == nil {
+		return
+	}
 
 	delete(srv.peers, p.ID())
 

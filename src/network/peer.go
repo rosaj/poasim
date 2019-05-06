@@ -74,6 +74,7 @@ type Peer struct {
 
 	flags connFlag
 
+
 }
 
 
@@ -158,19 +159,51 @@ func (p *Peer) pingLoop() {
 }
 
 func (p *Peer) startProtocols()  {
-	//TODO: impl this
+
+	protocols := p.Server().Protocols
+	if protocols != nil {
+		for _, protocol := range protocols {
+			protocol.Run(p)
+		}
+	}
+}
+
+func (p *Peer) closeProtocols()  {
+
+	protocols := p.Server().Protocols
+
+	if protocols != nil {
+		for _, protocol := range protocols {
+			protocol.Close(p)
+		}
+	}
 }
 
 
-
 func (p *Peer) Close()  {
+
+	if p.quit {
+		return
+	}
+
 	p.Log("Closing")
 	p.quit = true
 	p.Server().DeletePeer(p)
+
+	p.closeProtocols()
+
 	//TODO ostalo kad se peer gasi
 }
 
 
+func (p *Peer) handleError(err error) bool {
+
+	if err != nil {
+		p.Close()
+		return false
+	}
+	return true
+}
 
 
 func (p *Peer) newMsg(to *Node, msgType string, content int, responseTo *Message, handler func())  *Message {
@@ -179,9 +212,7 @@ func (p *Peer) newMsg(to *Node, msgType string, content int, responseTo *Message
 		handler, responseTo,
 		func(m *Message, err error) {
 
-			if err != nil {
-				p.Close()
-			}
+			p.handleError(err)
 
 		}, 0)
 

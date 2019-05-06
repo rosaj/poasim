@@ -25,7 +25,28 @@ var (
 
 	DEVP2P_PING	= "DEVP2P_PING"
 	DEVP2P_PONG	= "DEVP2P_PING"
-)
+
+
+	// eth protocol message codes
+
+	// Protocol messages belonging to eth/62
+	STATUS_MSG				= "StatusMsg"
+	NEW_BLOCK_HASHES_MSG	= "NewBlockHashesMsg"
+	TX_MSG					= "TxMsg"
+	GET_BLOCK_HEADERS_MSG	= "GetBlockHeadersMsg"
+	BLOCK_HEADERS_MSG		= "BlockHeadersMsg"
+	GET_BLOCK_BODIES_MSG	= "	GetBlockBodiesMsg"
+	BLOCK_BODIES_MSG		= "BlockBodiesMsg"
+	NEW_BLOCK_MSG			= "NewBlockMsg"
+
+	// Protocol messages belonging to eth/63
+	GET_NODE_DATA_MSG		= "GetNodeDataMsg"
+	NODE_DATA_MSG			= "NodeDataMsg"
+	GET_RECEIPTS_MSG		= "GetReceiptsMsg"
+	RECEIPTS_MSG			= "ReceiptsMsg"
+
+	)
+
 
 
 type Message struct {

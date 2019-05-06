@@ -74,7 +74,7 @@ type metricConfig struct {
 
 var SimConfig = config {
 
-	SimulationTime: (3 * time.Hour).Seconds(),
+	SimulationTime: (24 * time.Hour).Seconds(),
 
 	NodeCount: 100,
 
