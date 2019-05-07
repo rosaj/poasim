@@ -206,7 +206,7 @@ func (p *Peer) handleError(err error) bool {
 }
 
 
-func (p *Peer) newMsg(to *Node, msgType string, content int, responseTo *Message, handler func())  *Message {
+func (p *Peer) newMsg(to *Node, msgType string, content interface{}, responseTo *Message, handler func())  *Message {
 
 	m := newMessage(p.self(), to, msgType, content, 0,
 		handler, responseTo,

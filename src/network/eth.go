@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/agoussia/godes"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core"
@@ -24,24 +25,6 @@ import (
 	"time"
 )
 
-// Constants to match up protocol versions and messages
-const (
-	eth62 = 62
-	eth63 = 63
-)
-
-// ProtocolName is the official short name of the protocol used during capability negotiation.
-var ProtocolName = "eth"
-
-// ProtocolVersions are the supported versions of the eth protocol (first is primary).
-var ProtocolVersions = []uint{eth63, eth62}
-
-// ProtocolLengths are the number of implemented message corresponding to different protocol versions.
-var ProtocolLengths = []uint64{17, 8}
-
-
-
-
 const (
 	softResponseLimit = 2 * 1024 * 1024 // Target maximum size of returned blocks, headers or node data.
 	estHeaderRlpSize  = 500             // Approximate size of an RLP encoded block header
@@ -57,22 +40,6 @@ const (
 var (
 	syncChallengeTimeout = 15 * time.Second // Time allowance for a node to reply to the sync progress challenge
 )
-
-
-
-func newEthProtocol() Protocol {
-	return Protocol{
-		Name:    ProtocolName,
-		Version: eth63,
-		Length:  17,
-
-		Run: func(peer *Peer) error {
-			return nil
-		},
-
-
-	}
-}
 
 
 
@@ -168,9 +135,7 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 			Run: func(p *p2p.Peer, rw p2p.MsgReadWriter) error {
 				peer := newPeer(int(version), p, rw)
 
-				manager.handle(peer, func(err error) {
-					peer.handleError(err)
-				})
+				manager.handle(peer)
 
 				select {
 				case manager.newPeerCh <- peer:
@@ -282,27 +247,31 @@ func (pm *ProtocolManager) Stop() {
 	// Wait for all peer handler goroutines and the loops to come down.
 	pm.wg.Wait()
 
-	log.Info("Ethereum protocol stopped")
 }
 
 
 
 // handle is the callback invoked to manage the life cycle of an eth peer. When
 // this function terminates, the peer is disconnected.
-func (pm *ProtocolManager) handle(p *ethPeer, onResolve func(err error)) {
+func (pm *ProtocolManager) handle(p *ethPeer) {
 	// Ignore maxPeers if this is a trusted peer
 	if pm.peers.Len() >= pm.maxPeers /* && !p.Peer.Info().Network.Trusted*/ {
-		onResolve(errors.New(DiscTooManyPeers.String()))
+
+		p.Log("Ethereum error connecting to peer", DiscTooManyPeers)
+		p.handleError(errors.New(DiscTooManyPeers.String()))
 	}
+
 	p.Log("Ethereum peer connected")
 
 	p.Handshake(func() {
 		// Register the peer locally
-		if err := pm.peers.Register(p); err != nil {
+		err := pm.peers.Register(p)
+
+		if err != nil {
+
 			p.Log("Ethereum peer registration failed", "err", err)
-			onResolve(err)
-		} else {
-			onResolve(nil)
+			p.handleError(err)
+
 		}
 	})
 
@@ -310,7 +279,7 @@ func (pm *ProtocolManager) handle(p *ethPeer, onResolve func(err error)) {
 
 // handleMsg is invoked whenever an inbound message is received from a remote
 // peer. The remote connection is torn down upon returning any error.
-func (pm *ProtocolManager) handleMsg(p *peer) error {
+func (pm *ProtocolManager) handleMsg(p *ethPeer) error {
 	// Read the next message from the remote peer, and ensure it's fully consumed
 	msg, err := p.rw.ReadMsg()
 	if err != nil {
@@ -681,6 +650,76 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		return errResp(ErrInvalidMsgCode, "%v", msg.Code)
 	}
 	return nil
+}
+
+func (pm *ProtocolManager) HandleTxMsg(p *ethPeer, m *Message)  {
+
+	rtxs := m.Content.(types.Transactions)
+
+	for i, tx := range rtxs {
+		// Validate and mark the remote transaction
+		if tx == nil {
+			p.handleError(errResp(ErrDecode, "transaction %d is nil", i))
+			return
+		}
+		p.MarkTransaction(tx.Hash())
+	}
+	p.pm.txpool.AddRemotes(rtxs)
+}
+
+
+
+func (pm *ProtocolManager) HandleNewBlockMsg(p *ethPeer, m *Message)  {
+	// Retrieve and decode the propagated block
+
+	var request = m.Content.(newBlockData)
+
+	request.Block.ReceivedAt = godes.GetSystemTime()
+	request.Block.ReceivedFrom = p
+
+	// Mark the peer as owning the block and schedule it for import
+	p.MarkBlock(request.Block.Hash())
+	pm.fetcher.Enqueue(p.id, request.Block)
+
+	// Assuming the block is importable by the peer, but possibly not yet done so,
+	// calculate the head hash and TD that the peer truly must have.
+	var (
+		trueHead = request.Block.ParentHash()
+		trueTD   = new(big.Int).Sub(request.TD, request.Block.Difficulty())
+	)
+	// Update the peer's total difficulty if better than the previous
+	if _, td := p.Head(); trueTD.Cmp(td) > 0 {
+		p.SetHead(trueHead, trueTD)
+
+		// Schedule a sync if above ours. Note, this will not fire a sync for a gap of
+		// a single block (as the true TD is below the propagated block), however this
+		// scenario should easily be covered by the fetcher.
+		currentBlock := pm.blockchain.CurrentBlock()
+		if trueTD.Cmp(pm.blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64())) > 0 {
+			go pm.synchronise(p)
+		}
+	}
+}
+
+
+
+func (pm *ProtocolManager) HandleNewBlockHashesMsg(p *ethPeer, m *Message) {
+	var announces  = m.Content.(newBlockHashesData)
+
+	// Mark the hashes as present at the remote node
+	for _, block := range announces {
+		p.MarkBlock(block.Hash)
+	}
+	// Schedule all the unknown hashes for retrieval
+	unknown := make(newBlockHashesData, 0, len(announces))
+	for _, block := range announces {
+		if !pm.blockchain.HasBlock(block.Hash, block.Number) {
+			unknown = append(unknown, block)
+		}
+	}
+	for _, block := range unknown {
+		pm.fetcher.Notify(p.id, block.Hash, block.Number, time.Now(), p.RequestOneHeader, p.RequestBodies)
+	}
 }
 
 // BroadcastBlock will either propagate a block to a subset of it's peers, or

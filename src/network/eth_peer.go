@@ -1,6 +1,5 @@
 package network
 
-
 import (
 	"errors"
 	"fmt"
@@ -8,11 +7,9 @@ import (
 	"sync"
 	"time"
 
-	mapset "github.com/deckarep/golang-set"
+	"github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/rlp"
 )
 
 var (
@@ -62,7 +59,7 @@ type ethPeer struct {
 
 	*Peer
 
-	protocolManager *ProtocolManager
+	pm *ProtocolManager
 
 	version  int         // Protocol version negotiated
 	syncDrop *time.Timer // Timed connection dropper if sync progress isn't validated in time
@@ -71,18 +68,19 @@ type ethPeer struct {
 	td   *big.Int
 	lock sync.RWMutex
 
-	knownTxs    mapset.Set                // Set of transaction hashes known to be known by this ethPeer
-	knownBlocks mapset.Set                // Set of block hashes known to be known by this ethPeer
-	queuedTxs   chan []*types.Transaction // Queue of transactions to broadcast to the ethPeer
-	queuedProps chan *propEvent           // Queue of blocks to broadcast to the ethPeer
-	queuedAnns  chan *types.Block         // Queue of blocks to announce to the ethPeer
-	term        chan struct{}             // Termination channel to stop the broadcaster
+	knownTxs     mapset.Set                // Set of transaction hashes known to be known by this ethPeer
+	knownBlocks  mapset.Set                // Set of block hashes known to be known by this ethPeer
+	queuedTxs    chan []*types.Transaction // Queue of transactions to broadcast to the ethPeer
+	queuedProps  chan *propEvent           // Queue of blocks to broadcast to the ethPeer
+	queuedAnns   chan *types.Block         // Queue of blocks to announce to the ethPeer
+	broadcasting bool
+	// Termination channel to stop the broadcaster
 }
 
 func newPeer(version int, p *Peer, pm *ProtocolManager) *ethPeer {
 	return &ethPeer{
 		Peer:        p,
-		protocolManager:pm,
+		pm:          pm,
 		version:     version,
 		id:          p.ID(),
 		knownTxs:    mapset.NewSet(),
@@ -90,7 +88,6 @@ func newPeer(version int, p *Peer, pm *ProtocolManager) *ethPeer {
 		queuedTxs:   make(chan []*types.Transaction, maxQueuedTxs),
 		queuedProps: make(chan *propEvent, maxQueuedProps),
 		queuedAnns:  make(chan *types.Block, maxQueuedAnns),
-		term:        make(chan struct{}),
 	}
 }
 
@@ -98,36 +95,27 @@ func newPeer(version int, p *Peer, pm *ProtocolManager) *ethPeer {
 // and transaction broadcasts into the remote ethPeer. The goal is to have an async
 // writer that does not lock up node internals.
 func (p *ethPeer) broadcast() {
-	for {
-		select {
+	if p.broadcasting || p.quit {
+		return
+	}
+
+	select {
 		case txs := <-p.queuedTxs:
-			if err := p.SendTransactions(txs); err != nil {
-				return
-			}
+
+			p.SendTransactions(txs)
 			p.Log("Broadcast transactions", "count", len(txs))
 
 		case prop := <-p.queuedProps:
-			if err := p.SendNewBlock(prop.block, prop.td); err != nil {
-				return
-			}
+
+			p.SendNewBlock(prop.block, prop.td)
 			p.Log("Propagated block", "number", prop.block.Number(), "hash", prop.block.Hash(), "td", prop.td)
 
 		case block := <-p.queuedAnns:
-			if err := p.SendNewBlockHashes([]common.Hash{block.Hash()}, []uint64{block.NumberU64()}); err != nil {
-				return
-			}
+			p.SendNewBlockHashes([]common.Hash{block.Hash()}, []uint64{block.NumberU64()})
 			p.Log("Announced block", "number", block.Number(), "hash", block.Hash())
-
-		case <-p.term:
-			return
-		}
 	}
 }
 
-// close signals the broadcast goroutine to terminate.
-func (p *ethPeer) close() {
-	close(p.term)
-}
 
 // Info gathers and returns a collection of metadata known about a ethPeer.
 func (p *ethPeer) Info() *PeerInfo {
@@ -179,14 +167,34 @@ func (p *ethPeer) MarkTransaction(hash common.Hash) {
 	p.knownTxs.Add(hash)
 }
 
+func (p *ethPeer) send(msgType string, content interface{}, handler func(m *Message)) (m *Message)  {
+	m = p.newMsg(p.node, msgType, content, nil, func() {
+		p.broadcasting = false
+		p.broadcast()
+		handler(m)
+	})
+
+	p.broadcasting = true
+
+	m.send()
+
+	return
+}
+
+
 // SendTransactions sends transactions to the ethPeer and includes the hashes
 // in its transaction hash set for future reference.
-func (p *ethPeer) SendTransactions(txs types.Transactions) error {
+func (p *ethPeer) SendTransactions(txs types.Transactions) {
 	for _, tx := range txs {
 		p.knownTxs.Add(tx.Hash())
 	}
-	return p2p.Send(p.rw, TxMsg, txs)
+	p.send(TX_MSG, txs, func(m *Message) {
+		otherPeer := p.nodesEthPeer()
+		otherPeer.pm.HandleTxMsg(otherPeer, m)
+	})
 }
+
+
 
 // AsyncSendTransactions queues list of transactions propagation to a remote
 // ethPeer. If the ethPeer's broadcast queue is full, the event is silently dropped.
@@ -196,6 +204,7 @@ func (p *ethPeer) AsyncSendTransactions(txs []*types.Transaction) {
 		for _, tx := range txs {
 			p.knownTxs.Add(tx.Hash())
 		}
+		p.broadcast()
 	default:
 		p.Log("Dropping transaction propagation", "count", len(txs))
 	}
@@ -203,16 +212,21 @@ func (p *ethPeer) AsyncSendTransactions(txs []*types.Transaction) {
 
 // SendNewBlockHashes announces the availability of a number of blocks through
 // a hash notification.
-func (p *ethPeer) SendNewBlockHashes(hashes []common.Hash, numbers []uint64) error {
+func (p *ethPeer) SendNewBlockHashes(hashes []common.Hash, numbers []uint64) {
 	for _, hash := range hashes {
 		p.knownBlocks.Add(hash)
 	}
+
 	request := make(newBlockHashesData, len(hashes))
 	for i := 0; i < len(hashes); i++ {
 		request[i].Hash = hashes[i]
 		request[i].Number = numbers[i]
 	}
-	return p2p.Send(p.rw, NewBlockHashesMsg, request)
+
+	p.send(NEW_BLOCK_HASHES_MSG, request, func(m *Message) {
+		otherPeer := p.nodesEthPeer()
+		otherPeer.pm.HandleNewBlockHashesMsg(otherPeer, m)
+	})
 }
 
 // AsyncSendNewBlockHash queues the availability of a block for propagation to a
@@ -222,15 +236,22 @@ func (p *ethPeer) AsyncSendNewBlockHash(block *types.Block) {
 	select {
 	case p.queuedAnns <- block:
 		p.knownBlocks.Add(block.Hash())
+		p.broadcast()
 	default:
 		p.Log("Dropping block announcement", "number", block.NumberU64(), "hash", block.Hash())
 	}
 }
 
 // SendNewBlock propagates an entire block to a remote ethPeer.
-func (p *ethPeer) SendNewBlock(block *types.Block, td *big.Int) error {
+func (p *ethPeer) SendNewBlock(block *types.Block, td *big.Int) {
 	p.knownBlocks.Add(block.Hash())
-	return p2p.Send(p.rw, NewBlockMsg, []interface{}{block, td})
+
+	// []interface{}{block, td}
+	p.send(NEW_BLOCK_MSG, newBlockData{block, td}, func(m *Message) {
+		otherPeer := p.nodesEthPeer()
+		otherPeer.pm.HandleNewBlockMsg(otherPeer, m)
+	})
+
 }
 
 // AsyncSendNewBlock queues an entire block for propagation to a remote ethPeer. If
@@ -239,11 +260,15 @@ func (p *ethPeer) AsyncSendNewBlock(block *types.Block, td *big.Int) {
 	select {
 	case p.queuedProps <- &propEvent{block: block, td: td}:
 		p.knownBlocks.Add(block.Hash())
+		p.broadcast()
 	default:
 		p.Log("Dropping block propagation", "number", block.NumberU64(), "hash", block.Hash())
 	}
 }
 
+
+
+/*
 // SendBlockHeaders sends a batch of block headers to the remote ethPeer.
 func (p *ethPeer) SendBlockHeaders(headers []*types.Header) error {
 	return p2p.Send(p.rw, BlockHeadersMsg, headers)
@@ -313,14 +338,18 @@ func (p *ethPeer) RequestReceipts(hashes []common.Hash) error {
 	return p2p.Send(p.rw, GetReceiptsMsg, hashes)
 }
 
+
+*/
+
 func (p *ethPeer) nodesEthPeer() *ethPeer {
 	return p.node.server.pm.findPeer(p.self())
 }
 
+
+
 func (p *ethPeer) Close()  {
 	p.Peer.Close()
 }
-
 
 
 
@@ -403,8 +432,6 @@ func (ps *peerSet) Register(p *ethPeer) error {
 
 	ps.peers[p.id] = p
 
-	//TODO: remove this
-	go p.broadcast()
 
 	return nil
 }
