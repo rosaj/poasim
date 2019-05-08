@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"sync"
 	"time"
 
 	"github.com/deckarep/golang-set"
@@ -66,7 +65,6 @@ type ethPeer struct {
 
 	head common.Hash
 	td   *big.Int
-	lock sync.RWMutex
 
 	knownTxs     mapset.Set                // Set of transaction hashes known to be known by this ethPeer
 	knownBlocks  mapset.Set                // Set of block hashes known to be known by this ethPeer
@@ -100,19 +98,22 @@ func (p *ethPeer) broadcast() {
 	}
 
 	select {
-		case txs := <-p.queuedTxs:
+	case txs := <-p.queuedTxs:
 
-			p.SendTransactions(txs)
-			p.Log("Broadcast transactions", "count", len(txs))
+		p.SendTransactions(txs)
+		p.Log("Broadcast transactions", "count", len(txs))
 
-		case prop := <-p.queuedProps:
+	case prop := <-p.queuedProps:
 
-			p.SendNewBlock(prop.block, prop.td)
-			p.Log("Propagated block", "number", prop.block.Number(), "hash", prop.block.Hash(), "td", prop.td)
+		p.SendNewBlock(prop.block, prop.td)
+		p.Log("Propagated block", "number", prop.block.Number(), "hash", prop.block.Hash(), "td", prop.td)
 
-		case block := <-p.queuedAnns:
-			p.SendNewBlockHashes([]common.Hash{block.Hash()}, []uint64{block.NumberU64()})
-			p.Log("Announced block", "number", block.Number(), "hash", block.Hash())
+	case block := <-p.queuedAnns:
+		p.SendNewBlockHashes([]common.Hash{block.Hash()}, []uint64{block.NumberU64()})
+		p.Log("Announced block", "number", block.Number(), "hash", block.Hash())
+
+	default:
+		return
 	}
 }
 
@@ -131,18 +132,12 @@ func (p *ethPeer) Info() *PeerInfo {
 // Head retrieves a copy of the current head hash and total difficulty of the
 // ethPeer.
 func (p *ethPeer) Head() (hash common.Hash, td *big.Int) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-
 	copy(hash[:], p.head[:])
 	return hash, new(big.Int).Set(p.td)
 }
 
 // SetHead updates the head hash and total difficulty of the ethPeer.
 func (p *ethPeer) SetHead(hash common.Hash, td *big.Int) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
 	copy(p.head[:], hash[:])
 	p.td.Set(td)
 }
@@ -168,11 +163,20 @@ func (p *ethPeer) MarkTransaction(hash common.Hash) {
 }
 
 func (p *ethPeer) send(msgType string, content interface{}, handler func(m *Message)) (m *Message)  {
-	m = p.newMsg(p.node, msgType, content, nil, func() {
-		p.broadcasting = false
-		p.broadcast()
-		handler(m)
-	})
+	m = p.newMsg(p.node, msgType, content, nil,
+		func() {
+
+			p.broadcasting = false
+			p.broadcast()
+
+			// ako se je peer na suprotonom nodu ugasija onda se gasi i ovaj
+			if p.nodesEthPeer() != nil {
+				handler(m)
+			} else {
+				p.handleError(DiscNetworkError)
+			}
+
+		})
 
 	p.broadcasting = true
 
@@ -246,7 +250,6 @@ func (p *ethPeer) AsyncSendNewBlockHash(block *types.Block) {
 func (p *ethPeer) SendNewBlock(block *types.Block, td *big.Int) {
 	p.knownBlocks.Add(block.Hash())
 
-	// []interface{}{block, td}
 	p.send(NEW_BLOCK_MSG, newBlockData{block, td}, func(m *Message) {
 		otherPeer := p.nodesEthPeer()
 		otherPeer.pm.HandleNewBlockMsg(otherPeer, m)
@@ -347,8 +350,8 @@ func (p *ethPeer) nodesEthPeer() *ethPeer {
 
 
 
-func (p *ethPeer) Close()  {
-	p.Peer.Close()
+func (p *ethPeer) Close(reason error)  {
+	p.Peer.Close(reason)
 }
 
 
@@ -367,10 +370,10 @@ func (p *ethPeer) newStatusMsg(responseTo *Message, onResponse func(m *Message, 
 
 	m = p.newEthMsg(STATUS_MSG, nil, responseTo, func() {
 
-			peer := p.nodesEthPeer()
+			peer := p.node.server.pm.findHandshakePeer(p.self())
 
 			if peer != nil {
-				peer.newStatusMsg(m, nil)
+				peer.newStatusMsg(m, nil).send()
 
 			} else if onResponse != nil {
 				onResponse(nil, errMsgTimeout)
@@ -386,6 +389,9 @@ func (p *ethPeer) newStatusMsg(responseTo *Message, onResponse func(m *Message, 
 func (p *ethPeer) Handshake(onSuccess func()) {
 
 	statusMsg := p.newStatusMsg(nil, func(m *Message, err error) {
+
+		p.pm.deleteHandshakePeer(p.node)
+
 		if p.handleError(err) {
 			onSuccess()
 		}
@@ -446,9 +452,13 @@ func (ps *peerSet) Unregister(id ID) error {
 	}
 	delete(ps.peers, id)
 
-	p.Close()
+	p.Close(DiscRequested)
 
 	return nil
+}
+
+func (ps *peerSet) Delete(id ID)  {
+	delete(ps.peers, id)
 }
 
 // Peer retrieves the registered ethPeer with the given id.
@@ -477,7 +487,7 @@ func (ps *peerSet) PeersWithoutBlock(hash common.Hash) []*ethPeer {
 // PeersWithoutTx retrieves a list of peers that do not have a given transaction
 // in their set of known hashes.
 func (ps *peerSet) PeersWithoutTx(hash common.Hash) []*ethPeer {
-	
+
 	list := make([]*ethPeer, 0, len(ps.peers))
 	for _, p := range ps.peers {
 		if !p.knownTxs.Contains(hash) {

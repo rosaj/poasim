@@ -75,7 +75,6 @@ type Server struct {
 
 	refreshFunc 	func()
 
-
 	pm				*ProtocolManager
 }
 
@@ -83,16 +82,23 @@ type Server struct {
 
 func NewServer(node *Node) *Server {
 
+	pm := NewProtocolManager()
+
 	return &Server{
 		node: node,
 		peers: make(map[ID]*Peer),
+		pm: pm,
 		Config : Config {
 			MaxPeers: config.SimConfig.MaxPeers,
 			BootstrapNodes: node.bootstrapNodes,
+			Protocols: pm.SubProtocols,
 		},
 	}
 }
 
+func (srv *Server) ProtocolManager() *ProtocolManager {
+	return srv.pm
+}
 
 // Self returns the local node's endpoint information.
 func (srv *Server) Self() *Node {

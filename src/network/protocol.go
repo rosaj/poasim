@@ -24,7 +24,7 @@ type Protocol struct {
 	// The ethPeer connection is closed when Start returns. It should return
 	// any protocol-level error (such as an I/O error) that is
 	// encountered.
-	Run func(peer *Peer) error
+	Run func(peer *Peer)
 
 	Close func(peer *Peer)
 /*

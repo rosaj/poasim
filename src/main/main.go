@@ -7,7 +7,11 @@ import (
 	"../util"
 	"fmt"
 	"github.com/agoussia/godes"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"math"
+	"math/big"
+	"math/rand"
 	"runtime"
 	sysTime "time"
 )
@@ -54,7 +58,7 @@ func runNodes() []*network.Node {
 	nodes := createSimNodes(bNodes)
 
 
-	for i:= 0; i < len(nodes) ; i++ {
+		for i:= 0; i < len(nodes) ; i++ {
 
 		nodeArrival := config.SimConfig.NextNodeArrival()
 
@@ -84,6 +88,29 @@ func runSim(){
 	util.Log("start")
 
 	nodes := runNodes()
+
+	godes.Advance(5 * 60)
+
+
+
+	interval := 1.0
+	times := 1000
+	for times > 0 {
+		times-=1
+		godes.Advance(interval)
+		interval+=0.1
+
+		txs := make([]*types.Transaction,0)
+
+		tx := types.NewTransaction(uint64(times), common.Address{}, big.NewInt(1000), 10000, big.NewInt(1999), nil)
+		txs = append(txs, tx)
+		nodes[rand.Intn(config.SimConfig.NodeCount)].Server().ProtocolManager().BroadcastTxs(txs)
+	}
+
+
+
+
+
 
 	/*
 

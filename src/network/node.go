@@ -191,6 +191,11 @@ func (n *Node) startServer()  {
 	n.server.Start()
 }
 
+func (n *Node) Server() *Server {
+	return n.server
+}
+
+
 func (n *Node) doChurn()  {
 
 

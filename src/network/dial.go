@@ -446,6 +446,8 @@ func (h *dialHistory) Pop() interface{} {
 }
 
 func (d *dialstate) log(a ...interface{})  {
-	util.Log("Dialstate:", a)
+	if config.LogConfig.LogDialing {
+		util.Log("Dialstate:", a)
+	}
 }
 

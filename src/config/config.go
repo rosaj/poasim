@@ -55,7 +55,11 @@ type logConfig struct {
 	// da li logirat poruke vezane uz Message tip
 	LogMessages bool
 
+	LogDialing bool
+
 	LogNode	bool
+
+	LogPeer	bool
 
 	LogDiscovery bool
 
@@ -74,15 +78,15 @@ type metricConfig struct {
 
 var SimConfig = config {
 
-	SimulationTime: (24 * time.Hour).Seconds(),
+	SimulationTime: (60 * time.Minute).Seconds(),
 
-	NodeCount: 100,
+	NodeCount: 50,
 
 	NodeStabilisationTime:  30 * time.Minute.Seconds(),
 
-	ChurnEnabled: true,
+	ChurnEnabled: false,
 
-	NodeArrivalDistr: NewNormalDistr((80*time.Minute.Seconds())/100, 0),
+	NodeArrivalDistr: NewNormalDistr((10*time.Minute.Seconds())/50, 0),
 
 	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Hour).Seconds())),
 
@@ -108,7 +112,11 @@ var LogConfig = logConfig {
 
 	LogMessages: false,
 
+	LogDialing: false,
+
 	LogNode: false,
+
+	LogPeer: true,
 
 	LogDiscovery: false,
 

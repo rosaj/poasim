@@ -128,8 +128,8 @@ func Stats(nodes []*network.Node)  {
 	fmt.Println("Points prepared")
 
 	err = plotutil.AddLines(p,
-		"Ping", ptss["PING"],
-		"Pong", ptss["PONG"],
+//		"Ping", ptss["PING"],
+	//	"Pong", ptss["PONG"],
 //		"FindNode", ptss["FINDNODE"],
 //		"Neighbors", ptss["NEIGHBORS"],
 //		"SEND_ERR", ptss["SEND_ERR"],
@@ -139,9 +139,10 @@ func Stats(nodes []*network.Node)  {
 //		"Neighbors_Received", ptss["NEIGHBORS_RECEIVED"],
 //		"RECIEVE_ERR", ptss["RECIEVE_ERR"],
 		"TABLE", ptss["TABLE"],
-		"Nodes", ptss["NODES"],
-		network.DEVP2P_PING, ptss[network.DEVP2P_PING],
-		network.DEVP2P_PONG, ptss[network.DEVP2P_PONG],
+//		"Nodes", ptss["NODES"],
+//		network.DEVP2P_PING, ptss[network.DEVP2P_PING],
+//		network.DEVP2P_PONG, ptss[network.DEVP2P_PONG],
+		network.TX_MSG, ptss[network.TX_MSG],
 		)
 
 	if err != nil {
@@ -152,7 +153,7 @@ func Stats(nodes []*network.Node)  {
 	xNames := make([]string, len(temp))
 
 	for i, val := range temp {
-		if math.Mod(float64(i), float64(len(xNames)/10)) == 0{
+		if math.Mod(float64(i), float64(len(xNames)/5)) == 0{
 			xNames[i] = util.ToDuration(val.X * config.MetricConfig.MsgGroupFactor).String()
 		}
 	}

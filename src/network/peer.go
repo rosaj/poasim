@@ -2,6 +2,7 @@
 package network
 
 import (
+	"../config"
 	"../util"
 	"errors"
 	"fmt"
@@ -74,7 +75,6 @@ type Peer struct {
 
 	flags connFlag
 
-
 }
 
 
@@ -98,18 +98,16 @@ func (p *Peer) ID() ID {
 	return p.node.ID()
 }
 
-
 // Name returns the node name that the remote node advertised.
 func (p *Peer) Name() string {
 	return p.node.Name()
 }
 
 
-
 // Disconnect terminates the peer connection with the given reason.
 // It returns immediately and does not wait until the connection is closed.
 func (p *Peer) Disconnect(reason DiscReason) {
-	p.Close()
+	p.Close(reason)
 }
 
 // String implements fmt.Stringer.
@@ -120,11 +118,6 @@ func (p *Peer) String() string {
 // Inbound returns true if the peer is an inbound connection
 func (p *Peer) Inbound() bool {
 	return p.is(inboundConn)
-}
-
-
-func (p *Peer) Log(a ...interface{}) {
-	util.Log(p, a)
 }
 
 
@@ -180,26 +173,24 @@ func (p *Peer) closeProtocols()  {
 }
 
 
-func (p *Peer) Close()  {
+func (p *Peer) Close(reason error)  {
 
 	if p.quit {
 		return
 	}
 
-	p.Log("Closing")
+	p.Log("Closing peer for error", reason)
 	p.quit = true
 	p.Server().DeletePeer(p)
 
 	p.closeProtocols()
-
-	//TODO ostalo kad se peer gasi
 }
 
 
 func (p *Peer) handleError(err error) bool {
 
 	if err != nil {
-		p.Close()
+		p.Close(err)
 		return false
 	}
 	return true
@@ -211,7 +202,7 @@ func (p *Peer) newMsg(to *Node, msgType string, content interface{}, responseTo 
 	m := newMessage(p.self(), to, msgType, content, 0,
 		handler, responseTo,
 		func(m *Message, err error) {
-
+			// bilo koji error gasi peer-a
 			p.handleError(err)
 
 		}, 0)
@@ -247,6 +238,14 @@ func (p *Peer) sendPingMsg()  {
 func (p *Peer) sendPongMsg(pingMsg *Message)  {
 	p.newPongMsg(p.node, pingMsg).send()
 }
+
+
+func (p *Peer) Log(a ...interface{}) {
+	if config.LogConfig.LogPeer {
+		util.Log(p.self(), p, a)
+	}
+}
+
 
 
 
