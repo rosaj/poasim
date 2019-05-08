@@ -76,22 +76,20 @@ type Server struct {
 	refreshFunc 	func()
 
 	pm				*ProtocolManager
+
+	peerStats		map[float64][]int
 }
 
 
 
 func NewServer(node *Node) *Server {
-
-	pm := NewProtocolManager()
-
 	return &Server{
 		node: node,
 		peers: make(map[ID]*Peer),
-		pm: pm,
+		peerStats: make(map[float64][]int),
 		Config : Config {
 			MaxPeers: config.SimConfig.MaxPeers,
 			BootstrapNodes: node.bootstrapNodes,
-			Protocols: pm.SubProtocols,
 		},
 	}
 }
@@ -131,12 +129,17 @@ func (srv *Server) Start() {
 	if srv.running {
 		return
 	}
+
 	srv.running = true
+
+	srv.pm = NewProtocolManager(srv)
+	srv.Protocols = srv.pm.SubProtocols
 
 	srv.setupDiscovery()
 
 	dynPeers := srv.maxDialedConns()
 	dialer := newDialState(srv.Self().ID(), srv.StaticNodes, srv.BootstrapNodes, srv.ntab, dynPeers)
+
 	srv.log("DynPeers:", dynPeers)
 	srv.run(dialer)
 }
@@ -303,6 +306,8 @@ func (srv *Server) addPeer(peer *Peer) error {
 
 	srv.Refresh()
 
+	srv.logPeerStats()
+
 	return err
 }
 
@@ -319,15 +324,12 @@ func (srv *Server) DeletePeer(p *Peer)  {
 	}
 
 	srv.Refresh()
+
+	srv.logPeerStats()
 }
 
 func (srv *Server) FindPeer(node *Node) *Peer {
-	for _, v := range srv.peers {
-		if v.ID() == node.ID() {
-			return v
-		}
-	}
-	return nil
+	return srv.peers[node.ID()]
 }
 
 
@@ -401,3 +403,9 @@ func (srv *Server) log(a ...interface{})  {
 
 }
 
+func (srv *Server) logPeerStats()  {
+
+	t := config.MetricConfig.GetTimeGroup()
+	srv.peerStats[t] = append(srv.peerStats[t], len(srv.peers))
+
+}

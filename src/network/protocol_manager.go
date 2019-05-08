@@ -2,6 +2,7 @@ package network
 
 import (
 	"../util"
+	"../config"
 	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
@@ -43,6 +44,10 @@ func errResp(code errCode, format string, v ...interface{}) error {
 }
 
 type ProtocolManager struct {
+	srv *Server
+
+
+
 	networkID uint64
 
 	fastSync  uint32 // Flag whether fast sync is enabled (gets disabled if we already have blocks)
@@ -78,16 +83,17 @@ type ProtocolManager struct {
 
 // NewProtocolManager returns a new Ethereum sub protocol manager. The Ethereum sub protocol manages peers capable
 // with the Ethereum network.
-func NewProtocolManager() *ProtocolManager {
+func NewProtocolManager(srv *Server) *ProtocolManager {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
+		srv:	srv,
 		networkID:   1,
 		peers:       newPeerSet(),
 		handshakePeers: newPeerSet(),
 		newPeerCh:   make(chan *ethPeer),
 		noMorePeers: make(chan struct{}),
 		quitSync:    make(chan struct{}),
-		maxPeers:  25,
+		maxPeers:  srv.MaxPeers,
 	}
 
 
@@ -104,23 +110,28 @@ func NewProtocolManager() *ProtocolManager {
 			manager.handle(peer)
 		},
 		Close: func(peer *Peer) {
-			manager.removePeer(peer.ID())
+			manager.removePeer(peer)
 		},
 	})
 
 	return manager
 }
 
-func (pm *ProtocolManager) removePeer(id ID) {
+func (pm *ProtocolManager) self() *Node  {
+	return pm.srv.node
+}
+
+
+func (pm *ProtocolManager) removePeer(p *Peer) {
 	// Short circuit if the peer was already removed
-	peer := pm.peers.Peer(id)
+	peer := pm.peers.Peer(p.ID())
 	if peer == nil {
 		return
 	}
 	pm.log("Removing Ethereum peer", "peer", peer)
 
 	// Unregister the peer from the downloader and Ethereum peer set
-	if err := pm.peers.Unregister(id); err != nil {
+	if err := pm.peers.Unregister(p.ID()); err != nil {
 		pm.log("Peer removal failed", "peer", peer, "err", err)
 	}
 
@@ -193,8 +204,9 @@ func (pm *ProtocolManager) handle(p *ethPeer) {
 		p.handleError(DiscTooManyPeers)
 	}
 
+	// dodaj peer u trenutne handshake peer-ove kako bi se moglo provjerit
+	// da li je i sa druge strane peer u handshake fazi
 	pm.handshakePeers.Register(p)
-
 
 	p.Log("Ethereum peer connected")
 
@@ -395,7 +407,12 @@ func (pm *ProtocolManager) PeerCount() int {
 	return pm.peers.Len()
 }
 
+func (pm *ProtocolManager) String() string {
+	return fmt.Sprintf("%s ProtocolManager",pm.self().Name())
+}
+
 func (pm *ProtocolManager) log(a ...interface{})  {
-	//TODO for node i log config flag
-	util.Log("ProtocolManager:", a)
+	if config.LogConfig.LogPeer {
+		util.Log(pm, a)
+	}
 }

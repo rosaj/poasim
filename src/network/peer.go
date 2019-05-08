@@ -67,6 +67,7 @@ const (
 // Peer represents a connected remote node.
 type Peer struct {
 	*godes.Runner
+
 	server *Server
 
 	node	*Node

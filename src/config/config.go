@@ -32,6 +32,9 @@ type config struct {
 	// vrijeme od kada se cvor spoji na mrezu do kada se zauvjek odspoji
 	NodeLifetimeDistr distribution
 
+	// distribucija spajanja novih nodova nakon sto se inicijalno svi nodovi spoje i mreza se stablizira
+	NewNodeArrivalDistr distribution
+
 	// latencija slanja poruke preko mreze
 	NetworkLatency distribution
 
@@ -62,7 +65,6 @@ type logConfig struct {
 	LogPeer	bool
 
 	LogDiscovery bool
-
 
 	LogServer bool
 

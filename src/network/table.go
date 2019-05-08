@@ -786,10 +786,4 @@ func (tab *Table) logNodes()  {
 	}
 
 	tab.nodeStat[config.MetricConfig.GetTimeGroup()] = count
-	/*
-	config.LogConfig.Logging = true
-	tab.log(config.MetricConfig.GetTimeGroup(),  count)
-	config.LogConfig.Logging = false
-	 */
-
 }

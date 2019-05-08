@@ -7,11 +7,7 @@ import (
 	"../util"
 	"fmt"
 	"github.com/agoussia/godes"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"math"
-	"math/big"
-	"math/rand"
 	"runtime"
 	sysTime "time"
 )
@@ -89,9 +85,10 @@ func runSim(){
 
 	nodes := runNodes()
 
+
+/*
+
 	godes.Advance(5 * 60)
-
-
 
 	interval := 1.0
 	times := 1000
@@ -108,7 +105,7 @@ func runSim(){
 	}
 
 
-
+*/
 
 
 
