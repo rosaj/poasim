@@ -60,7 +60,7 @@ type Message struct {
 	//TODO: poruka ima velicinu i latencija ovisi o velicini
 
 	latency    float64
-	handler    func()
+	handler    func(m *Message)
 	onResponse func(m *Message, err error)
 
 	responseTo *Message
@@ -102,7 +102,7 @@ func newMessage(
 	msgType string,
 	content interface{},
 	expiration float64,
-	handler func(),
+	handler func(m *Message),
 	responseTo *Message,
 	onResponse func(m *Message, err error),
 	responseTimeout float64) (m *Message) {
@@ -139,7 +139,7 @@ func (m *Message) send() {
 
 func (m *Message) handle() {
 	if m.handler != nil {
-		m.handler()
+		m.handler(m)
 	}
 }
 

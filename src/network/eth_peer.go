@@ -162,21 +162,22 @@ func (p *ethPeer) MarkTransaction(hash common.Hash) {
 	p.knownTxs.Add(hash)
 }
 
-func (p *ethPeer) send(msgType string, content interface{}, handler func(m *Message)) (m *Message)  {
-	m = p.newMsg(p.node, msgType, content, nil,
-		func() {
+func (p *ethPeer) send(msgType string, content interface{}, handler func(m *Message))  {
+	m := p.newMsg(p.node, msgType, content, nil,
+			func(m *Message) {
 
-			p.broadcasting = false
-			p.broadcast()
+				p.broadcasting = false
+				//TODO: dali cekat network latency da se posalje ili samo neko vrijeme writera
+				p.broadcast()
 
-			// ako se je peer na suprotonom nodu ugasija onda se gasi i ovaj
-			if p.nodesEthPeer() != nil {
-				handler(m)
-			} else {
-				p.handleError(DiscNetworkError)
-			}
+				// ako se je peer na suprotonom nodu ugasija onda se gasi i ovaj
+				if p.nodesEthPeer() != nil {
+					handler(m)
+				} else {
+					p.handleError(DiscNetworkError)
+				}
 
-		})
+			})
 
 	p.broadcasting = true
 
@@ -357,7 +358,7 @@ func (p *ethPeer) Close(reason error)  {
 
 
 func (p *ethPeer) newEthMsg(msgType string, content interface{}, responseTo *Message,
-							handler func(), onResponse func(m *Message, err error), responseTimeout float64)  *Message {
+							handler func(m *Message), onResponse func(m *Message, err error), responseTimeout float64)  *Message {
 
 	m := newMessage(p.self(), p.node, msgType, content, 0,
 		handler, responseTo,
@@ -366,22 +367,20 @@ func (p *ethPeer) newEthMsg(msgType string, content interface{}, responseTo *Mes
 	return m
 }
 
-func (p *ethPeer) newStatusMsg(responseTo *Message, onResponse func(m *Message, err error)) (m *Message)  {
+func (p *ethPeer) newStatusMsg(responseTo *Message, onResponse func(m *Message, err error)) *Message  {
 
-	m = p.newEthMsg(STATUS_MSG, nil, responseTo, func() {
+	return p.newEthMsg(STATUS_MSG, nil, responseTo, func(m *Message) {
 
-			peer := p.node.server.pm.findHandshakePeer(p.self())
+					peer := p.node.server.pm.findHandshakePeer(p.self())
 
-			if peer != nil {
-				peer.newStatusMsg(m, nil).send()
+					if peer != nil {
+						peer.newStatusMsg(m, nil).send()
 
-			} else if onResponse != nil {
-				onResponse(nil, errMsgTimeout)
-			}
+					} else if onResponse != nil {
+						onResponse(nil, errMsgTimeout)
+					}
 
-	}, onResponse, handshakeTimeout.Seconds())
-
-	return
+			}, onResponse, handshakeTimeout.Seconds())
 }
 
 // Handshake executes the eth protocol handshake, negotiating version number,
@@ -474,7 +473,7 @@ func (ps *peerSet) Len() int {
 // PeersWithoutBlock retrieves a list of peers that do not have a given block in
 // their set of known hashes.
 func (ps *peerSet) PeersWithoutBlock(hash common.Hash) []*ethPeer {
-	
+
 	list := make([]*ethPeer, 0, len(ps.peers))
 	for _, p := range ps.peers {
 		if !p.knownBlocks.Contains(hash) {
@@ -499,7 +498,7 @@ func (ps *peerSet) PeersWithoutTx(hash common.Hash) []*ethPeer {
 
 // BestPeer retrieves the known ethPeer with the currently highest total difficulty.
 func (ps *peerSet) BestPeer() *ethPeer {
-	
+
 	var (
 		bestPeer *ethPeer
 		bestTd   *big.Int

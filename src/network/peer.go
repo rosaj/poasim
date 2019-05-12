@@ -198,33 +198,31 @@ func (p *Peer) handleError(err error) bool {
 }
 
 
-func (p *Peer) newMsg(to *Node, msgType string, content interface{}, responseTo *Message, handler func())  *Message {
+func (p *Peer) newMsg(to *Node, msgType string, content interface{}, responseTo *Message, handler func(m *Message))  *Message {
 
-	m := newMessage(p.self(), to, msgType, content, 0,
-		handler, responseTo,
-		func(m *Message, err error) {
-			// bilo koji error gasi peer-a
-			p.handleError(err)
+	return newMessage(p.self(), to, msgType, content, 0,
+			handler, responseTo,
+			func(m *Message, err error) {
+				// bilo koji error gasi peer-a
+				p.handleError(err)
 
-		}, 0)
+			}, 0)
 
-	return m
 }
 
-func (p *Peer) newPingMsg(to *Node) (m *Message) {
-	m = p.newMsg(to, DEVP2P_PING, pingMsg, nil,
-		func() {
-			// ako node sa druge strane takoder ima peer prema nama
-			// onda posalji pong messasge
-			peer := to.server.FindPeer(p.self())
+func (p *Peer) newPingMsg(to *Node) *Message {
+	return p.newMsg(to, DEVP2P_PING, pingMsg, nil,
+			func(m *Message) {
+				// ako node sa druge strane takoder ima peer prema nama
+				// onda posalji pong messasge
+				peer := to.server.FindPeer(p.self())
 
-			if peer != nil {
-				peer.sendPongMsg(m)
-			}
+				if peer != nil {
+					peer.sendPongMsg(m)
+				}
 
-		})
+			})
 
-	return
 }
 
 func (p *Peer) newPongMsg(to *Node, responseTo *Message) (m *Message) {

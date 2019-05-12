@@ -269,49 +269,41 @@ func getExpirationTime() float64  {
 	return godes.GetSystemTime() + expiration.Seconds()
 }
 
-func newPingMessage(from *Node, to *Node, onResponse func(m *Message, err error)) (m *Message) {
-	m = newMessage(from, to, PING, PING, getExpirationTime(),
-		func() {
-			p := &ping{m}
-			handlePacket(p)
-		},
-		nil, onResponse,
-		respTimeout.Seconds())
-	return
+func newPingMessage(from *Node, to *Node, onResponse func(m *Message, err error)) *Message {
+	return newMessage(from, to, PING, PING, getExpirationTime(),
+			func(m *Message) {
+				handlePacket(&ping{m})
+			},
+			nil, onResponse,
+			respTimeout.Seconds())
 }
 
-func newPongMessage(from *Node, to *Node, responseTo *Message) (m *Message)  {
-	m = newMessage(from, to, PONG, PONG, getExpirationTime(),
-		func() {
-			p := &pong{m}
-			handlePacket(p)
-		},
-		responseTo, nil,
-		0)
-	return
+func newPongMessage(from *Node, to *Node, responseTo *Message) *Message  {
+	return newMessage(from, to, PONG, PONG, getExpirationTime(),
+			func(m *Message) {
+				handlePacket(&pong{m})
+			},
+			responseTo, nil,
+			0)
 }
 
 
-func newFindNodeMessage(from *Node, to *Node, pubkey encPubkey, onResponse func(m *Message, err error)) (m *Message)  {
-	m = newMessage(from, to, FINDNODE, pubkey,getExpirationTime(),
-		func() {
-			p := &findnode{m}
-			handlePacket(p)
-		},
-		nil, onResponse,
-		respTimeout.Seconds())
-	return
+func newFindNodeMessage(from *Node, to *Node, pubkey encPubkey, onResponse func(m *Message, err error)) *Message  {
+	return newMessage(from, to, FINDNODE, pubkey,getExpirationTime(),
+			func(m *Message) {
+				handlePacket(&findnode{m})
+			},
+			nil, onResponse,
+			respTimeout.Seconds())
 }
 
-func newNeighborsMessage(from *Node, to *Node, nodes *nodesByDistance, responseToMsg *Message) (m *Message)  {
-	m = newMessage(from, to, NEIGHBORS, nodes,getExpirationTime(),
-		func() {
-			p := &neighbors{m}
-			handlePacket(p)
-		},
-		responseToMsg, nil,
-		0)
-	return
+func newNeighborsMessage(from *Node, to *Node, nodes *nodesByDistance, responseToMsg *Message) *Message  {
+	return newMessage(from, to, NEIGHBORS, nodes,getExpirationTime(),
+			func(m *Message) {
+				handlePacket(&neighbors{m})
+			},
+			responseToMsg, nil,
+			0)
 }
 
 
