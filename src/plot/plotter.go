@@ -2,8 +2,10 @@ package plot
 
 import (
 	"../config"
-	"../network"
+	. "../network"
+	//. "../network/message"
 	"../util"
+	"encoding/csv"
 	"fmt"
 	"github.com/agoussia/godes"
 	"gonum.org/v1/plot"
@@ -12,6 +14,7 @@ import (
 	"gonum.org/v1/plot/vg"
 	"math"
 	"math/rand"
+	"os"
 	"sort"
 	"strconv"
 )
@@ -24,6 +27,7 @@ func addPoints(vals map[float64]float64, key string, ptss map[string]plotter.XYs
 		keys = append(keys, k)
 	}
 	sort.Float64s(keys)
+
 
 	pts := make(plotter.XYs, len(vals))
 
@@ -39,10 +43,35 @@ func addPoints(vals map[float64]float64, key string, ptss map[string]plotter.XYs
 	ptss[key] = pts
 }
 
+func calcMeanPoints(nodes []*Node, dataFunc func(n *Node) map[float64][]int, key string, ptss map[string]plotter.XYs) {
 
-func Stats(nodes []*network.Node)  {
 
-	all := make(map[string][]network.Msg)
+	stats := make(map[float64][]float64)
+
+	for _, node := range nodes {
+		tableStats := dataFunc(node)
+		for k, v := range tableStats {
+			sum := 0
+			for _, intVal := range v {
+				sum += intVal
+			}
+			stats[k] = append(stats[k], float64(sum/len(v)))
+		}
+	}
+
+
+	vals := make(map[float64]float64)
+	for k,v := range stats {
+		vals[k] = godes.Mean(v)
+	}
+
+	addPoints(vals, key, ptss)
+
+}
+
+func Stats(nodes []*Node)  {
+
+	all := make(map[string][]Msg)
 
 	for _, node := range nodes {
 		sent := node.GetMessagesSent()
@@ -68,7 +97,7 @@ func Stats(nodes []*network.Node)  {
 	p.Title.Text = fmt.Sprintf("Messages, nodes: %d, node arrival every: %s, grouped every: %s",
 		config.SimConfig.NodeCount,
 		util.ToDuration(config.SimConfig.NextNodeArrival()).String(),
-		util.ToDuration(config.MetricConfig.MsgGroupFactor).String())
+		util.ToDuration(config.MetricConfig.GroupFactor).String())
 
 	p.X.Label.Text = "Time"
 	p.Y.Label.Text = "Count"
@@ -88,12 +117,19 @@ func Stats(nodes []*network.Node)  {
 	}
 
 
+
+	/*
+
 	tStats := make(map[float64][]float64)
 
 	for _, node := range nodes {
 		tableStats := node.GetTableStats()
 		for k, v := range tableStats {
-			tStats[k] = append(tStats[k], float64(v))
+			sum := 0
+			for _, intVal := range v {
+				sum += intVal
+			}
+			tStats[k] = append(tStats[k], float64(sum/len(v)))
 		}
 	}
 
@@ -105,12 +141,20 @@ func Stats(nodes []*network.Node)  {
 
 	addPoints(vals, "TABLE", ptss)
 
+*/
+
+	calcMeanPoints(nodes, func(n *Node) map[float64][]int {
+		return n.GetTableStats()
+	}, "TABLE", ptss)
+
+	calcMeanPoints(nodes, func(n *Node) map[float64][]int {
+		return n.GetServerPeersStats()
+	}, "Peers", ptss)
 
 
+	nStats := GetNodeStats()
 
-	nStats := network.GetNodeStats()
-
-	vals = make(map[float64]float64)
+	vals := make(map[float64]float64)
 	for k,v := range nStats {
 		sum := 0
 		for _, v := range v {
@@ -138,11 +182,14 @@ func Stats(nodes []*network.Node)  {
 //		"FindNode_Received", ptss["FINDNODE_RECEIVED"],
 //		"Neighbors_Received", ptss["NEIGHBORS_RECEIVED"],
 //		"RECIEVE_ERR", ptss["RECIEVE_ERR"],
-		"TABLE", ptss["TABLE"],
+//		"TABLE", ptss["TABLE"],
 //		"Nodes", ptss["NODES"],
-//		network.DEVP2P_PING, ptss[network.DEVP2P_PING],
-//		network.DEVP2P_PONG, ptss[network.DEVP2P_PONG],
-		network.TX_MSG, ptss[network.TX_MSG],
+//		DEVP2P_PING, ptss[DEVP2P_PING],
+//		DEVP2P_PONG, ptss[DEVP2P_PONG],
+//		network.TX_MSG, ptss[network.TX_MSG],
+		"Peers", ptss["Peers"],
+//		DEVP2P_HANDSHAKE, ptss[DEVP2P_HANDSHAKE],
+//		STATUS_MSG, ptss[STATUS_MSG],
 		)
 
 	if err != nil {
@@ -154,7 +201,7 @@ func Stats(nodes []*network.Node)  {
 
 	for i, val := range temp {
 		if math.Mod(float64(i), float64(len(xNames)/5)) == 0{
-			xNames[i] = util.ToDuration(val.X * config.MetricConfig.MsgGroupFactor).String()
+			xNames[i] = util.ToDuration(val.X * config.MetricConfig.GroupFactor).String()
 		}
 	}
 
@@ -162,16 +209,119 @@ func Stats(nodes []*network.Node)  {
 
 	fmt.Println("X names set")
 
-	name := fmt.Sprintf("msg_%s_%s_.png",
-		util.ToDuration(config.SimConfig.SimulationTime).String(),
-		strconv.Itoa(config.SimConfig.NodeCount))
+	exportType := "png"
 
-	// Save the plot to a PNG file.
-	if err := p.Save(vg.Length(1280), vg.Length(768), name); err != nil {
-		panic(err)
+	name := fmt.Sprintf("msg_%s_%s_%s.%s",
+		util.ToDuration(config.SimConfig.SimulationTime).String(),
+		strconv.Itoa(config.SimConfig.NodeCount),
+		strconv.Itoa(int(config.MetricConfig.GroupFactor)),
+		exportType)
+
+	if exportType == "png" {
+		// Save the plot to a PNG file.
+		if err := p.Save(vg.Length(1280), vg.Length(768), name); err != nil {
+			panic(err)
+		}
+	} else if exportType == "csv" {
+		csvExport(ptss, name)
 	}
+
+
 	fmt.Println("wrote to", name)
 
+}
+
+func csvExport(data map[string]plotter.XYs, name string) error {
+	file, err := os.Create(name)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	// To store the keys in slice in sorted order
+	var keys []string
+	for k := range data {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+
+	headers := make([]string, 0)
+	headers = append(headers, "ROWID", "Time")
+
+	for _, key := range keys {
+		headers = append(headers, key)
+	}
+
+	if err := writer.Write(headers); err != nil {
+		return err
+	}
+
+	rows := make([][]string, 0)
+
+	for _, v := range data["ALL"] {
+
+		row := make([]string, 0)
+		row = append(row, strconv.Itoa(int(v.X)),util.ToDuration(v.X * config.MetricConfig.GroupFactor).String())
+		rows = append(rows, row)
+	}
+
+	all := data["ALL"]
+
+	for _, key := range keys {
+		value := data[key]
+		i := 0
+		for _, xy := range value {
+			for all[i].X < xy.X {
+				rows[i] = append(rows[i], "")
+				i++
+			}
+			rows[i] = append(rows[i], strconv.Itoa(int(xy.Y)))
+			i++
+		}
+
+	}
+
+	for _, row := range rows {
+
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+
+/*
+	for _, key := range keys {
+		value := data[key]
+
+		row := make([]string, 0)
+		row = append(row, "Type")
+
+		vals := make([]string, 0)
+		vals = append(vals, key)
+
+		for _, v := range value {
+			row = append(row, util.ToDuration(v.X * config.MetricConfig.GroupFactor).String())
+			vals = append(vals, strconv.Itoa(int(v.Y)))
+		}
+
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+		if err := writer.Write(vals); err != nil {
+			return err
+		}
+
+
+	}
+
+*/
+
+
+
+	return nil
 }
 
 

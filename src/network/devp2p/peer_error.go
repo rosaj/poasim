@@ -1,4 +1,4 @@
-package network
+package devp2p
 
 import (
 	"errors"
@@ -67,7 +67,7 @@ var discReasonToString = [...]string{
 	DiscInvalidIdentity:     "invalid node identity",
 	DiscQuitting:            "client quitting",
 	DiscUnexpectedIdentity:  "unexpected identity",
-	DiscSelf:                "connected to self",
+	DiscSelf:                "connected to Self",
 	DiscReadTimeout:         "read timeout",
 	DiscSubprotocolError:    "subprotocol error",
 }
@@ -101,5 +101,6 @@ func discReasonForError(err error) DiscReason {
 	}
 	return DiscSubprotocolError
 }
+
 
 

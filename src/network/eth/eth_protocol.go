@@ -1,5 +1,6 @@
-package network
+package eth
 import (
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -47,36 +48,20 @@ const (
 	ReceiptsMsg    = 0x10
 )
 
-type errCode int
 
-const (
-	ErrMsgTooLarge = iota
-	ErrDecode
-	ErrInvalidMsgCode
-	ErrProtocolVersionMismatch
-	ErrNetworkIdMismatch
-	ErrGenesisBlockMismatch
-	ErrNoStatusMsg
-	ErrExtraStatusMsg
-	ErrSuspendedPeer
+
+var (
+	ErrMsgTooLarge             = errors.New("Message too long")
+	ErrDecode                  = errors.New("Invalid message")
+	ErrInvalidMsgCode          = errors.New("Invalid message code")
+	ErrProtocolVersionMismatch = errors.New("Protocol version mismatch")
+	ErrNetworkIdMismatch       = errors.New("NetworkId mismatch")
+	ErrGenesisBlockMismatch    = errors.New("Genesis block mismatch")
+	ErrNoStatusMsg             = errors.New("No status message")
+	ErrExtraStatusMsg          = errors.New("Extra status message")
+	ErrSuspendedPeer           = errors.New("Suspended peer")
 )
 
-func (e errCode) String() string {
-	return errorString[int(e)]
-}
-
-// XXX change once legacy code is out
-var errorString = map[int]string{
-	ErrMsgTooLarge:             "Message too long",
-	ErrDecode:                  "Invalid message",
-	ErrInvalidMsgCode:          "Invalid message code",
-	ErrProtocolVersionMismatch: "Protocol version mismatch",
-	ErrNetworkIdMismatch:       "NetworkId mismatch",
-	ErrGenesisBlockMismatch:    "Genesis block mismatch",
-	ErrNoStatusMsg:             "No status message",
-	ErrExtraStatusMsg:          "Extra status message",
-	ErrSuspendedPeer:           "Suspended peer",
-}
 
 type txPool interface {
 	// AddRemotes should add the given transactions to the pool.

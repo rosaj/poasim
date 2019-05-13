@@ -3,6 +3,7 @@ package main
 import (
 	"../config"
 	"../network"
+	"../network/protocol"
 	"../plot"
 	"../util"
 	"fmt"
@@ -15,13 +16,36 @@ import (
 
 var startTime sysTime.Time
 
+var c = 0
+
+func newNodeConfig(bootstrapNodes []*network.Node) *network.NodeConfig {
+
+
+	protocols := make([]string, 0)
+	protocols = append(protocols, protocol.ETH)
+	networkId := 1
+
+/*
+	c++
+	if (c == 56) || (c == 64) || (c == 84) {
+		networkId = 3
+	}
+*/
+
+	return &network.NodeConfig{
+		BootstrapNodes: bootstrapNodes,
+		MaxPeers: config.SimConfig.MaxPeers,
+		Protocols: protocols,
+		NetworkID: networkId,
+	}
+}
 
 func runBootstrapNodes() []*network.Node {
 
 	bootstrapNodes := make([]*network.Node, 3)
 
 	for i := 0; i < len(bootstrapNodes); i++{
-		bootstrapNodes[i] = network.NewBootstrapNode(bootstrapNodes)
+		bootstrapNodes[i] = network.NewBootstrapNode(newNodeConfig(bootstrapNodes))
 	}
 
 	for i := 0; i < len(bootstrapNodes); i++{
@@ -37,7 +61,7 @@ func createNodes(bootstrapNodes []*network.Node, count int) []*network.Node {
 	nodes := make([]*network.Node, count)
 
 	for i:=0 ; i < len(nodes); i++ {
-		nodes[i] = network.NewNode(bootstrapNodes)
+		nodes[i] = network.NewNode(newNodeConfig(bootstrapNodes))
 	}
 
 	return nodes
@@ -85,6 +109,20 @@ func runSim(){
 
 	nodes := runNodes()
 
+
+	/*
+	 for !config.SimConfig.SimulationEnded() {
+	 	  godes.Advance(5 * 60)
+
+		 for i, node := range nodes {
+			if node.NetworkID == 3 {
+		 	  logProgress(i, node.Server().PeerCount(),node.Server().ProtocolManager().PeerCount())
+			}
+		 }
+
+		 logProgress("------")
+	 }
+	*/
 
 /*
 

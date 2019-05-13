@@ -1,9 +1,11 @@
 
-package network
+package devp2p
 
 import (
-	"../config"
-	"../util"
+	. "../../common"
+	. "../../config"
+	. "../../network/message"
+	. "../../util"
 	"errors"
 	"fmt"
 	"github.com/agoussia/godes"
@@ -32,6 +34,8 @@ const (
 	pingMsg      = 0x02
 	pongMsg      = 0x03
 )
+
+const handshakeTimeout  = 5 * time.Second
 
 type connFlag int32
 
@@ -64,13 +68,13 @@ const (
 )
 
 
-// Peer represents a connected remote node.
+// Peer represents a connected remote INode.
 type Peer struct {
 	*godes.Runner
 
 	server *Server
 
-	node	*Node
+	node	INode
 
 	quit 	bool
 
@@ -80,7 +84,7 @@ type Peer struct {
 
 
 
-func NewPeer(server *Server, node *Node) *Peer {
+func NewPeer(server *Server, node INode) *Peer {
 	return &Peer{
 		Runner: &godes.Runner{},
 		server: server,
@@ -91,23 +95,27 @@ func NewPeer(server *Server, node *Node) *Peer {
 func (p *Peer) Server() *Server  {
 	return p.server
 }
-func (p *Peer) self() *Node {
+func (p *Peer) Self() INode {
 	return p.server.Self()
 }
-// ID returns the node's public key.
+// ID returns the INode's public key.
 func (p *Peer) ID() ID {
-	return p.node.ID()
+	return p.Node().ID()
 }
 
-// Name returns the node name that the remote node advertised.
+// Name returns the INode name that the remote INode advertised.
 func (p *Peer) Name() string {
-	return p.node.Name()
+	return p.Node().Name()
+}
+
+func (p *Peer) Node() INode {
+	return p.node
 }
 
 
 // Disconnect terminates the peer connection with the given reason.
 // It returns immediately and does not wait until the connection is closed.
-func (p *Peer) Disconnect(reason DiscReason) {
+func (p *Peer) Disconnect(reason error) {
 	p.Close(reason)
 }
 
@@ -147,7 +155,7 @@ func (p *Peer) pingLoop() {
 			return
 		}
 
-		p.sendPingMsg()
+		p.SendPingMsg()
 	}
 
 }
@@ -187,8 +195,12 @@ func (p *Peer) Close(reason error)  {
 	p.closeProtocols()
 }
 
+func (p *Peer) IsClosed() bool {
+	return p.quit
+}
 
-func (p *Peer) handleError(err error) bool {
+
+func (p *Peer) HandleError(err error) bool {
 
 	if err != nil {
 		p.Close(err)
@@ -196,52 +208,88 @@ func (p *Peer) handleError(err error) bool {
 	}
 	return true
 }
+// proto handshake salje handshake poruku peer-u asinkrono
+// i istovremeno ceka na handshake poruku od peer-a
+// to znaci da oba peer-a moraju cekat poruku prije nego je bilo koji od njih 2 posalje
+// jer ako peer posalje handshake poruku a ovaj drugi jos ni pocea citat handshake poruku
+// drugi peer nece nikad zaprimit handshake poruku ovog prvog
+func (p *Peer) doProtoHandshake(onHandshake func(err error)) {
+	p.sendHandshakeMsg(onHandshake)
+}
+
+func (p *Peer) sendHandshakeMsg(onHandshake func(err error))  {
+	p.newHandshakeMsg(onHandshake).Send()
+}
+
+func (p *Peer) newHandshakeMsg(onHandshake func(err error)) *Message {
+
+	return NewMessage(p.Self(), p.Node(), DEVP2P_HANDSHAKE, handshakeMsg, 0,
+			func(m *Message) {
+				handshakePeer := p.Node().Server().RetrieveHandshakePeer(p.Self())
+
+				if handshakePeer != nil {
+					onHandshake(nil)
+				} else {
+					onHandshake(DiscReadTimeout)
+				}
+
+			}, nil, func(m *Message, err error) {
+				p.Node().Server().RetrieveHandshakePeer(p.Self())
+				onHandshake(err)
+
+		},handshakeTimeout.Seconds())
+
+}
 
 
-func (p *Peer) newMsg(to *Node, msgType string, content interface{}, responseTo *Message, handler func(m *Message))  *Message {
+func (p *Peer) NewMsg(to INode, msgType string, content interface{}, responseTo *Message, handler func(m *Message))  *Message {
 
-	return newMessage(p.self(), to, msgType, content, 0,
+	return NewMessage(p.Self(), to, msgType, content, 0,
 			handler, responseTo,
 			func(m *Message, err error) {
 				// bilo koji error gasi peer-a
-				p.handleError(err)
+				p.HandleError(err)
 
 			}, 0)
 
 }
 
-func (p *Peer) newPingMsg(to *Node) *Message {
-	return p.newMsg(to, DEVP2P_PING, pingMsg, nil,
+func (p *Peer) newPingMsg(to INode) *Message {
+	return p.NewMsg(to, DEVP2P_PING, pingMsg, nil,
 			func(m *Message) {
-				// ako node sa druge strane takoder ima peer prema nama
+				// ako INode sa druge strane takoder ima peer prema nama
 				// onda posalji pong messasge
-				peer := to.server.FindPeer(p.self())
+				peer := to.Server().FindPeer(p.Self())
 
-				if peer != nil {
-					peer.sendPongMsg(m)
+				//interface ni nikad null pa se treba provjerit underlying struct
+				if peer.(*Peer) != nil {
+					peer.SendPongMsg(m)
+				} else {
+					p.HandleError(DiscRequested)
 				}
 
 			})
 
 }
 
-func (p *Peer) newPongMsg(to *Node, responseTo *Message) (m *Message) {
-	m = p.newMsg(to, DEVP2P_PONG, pongMsg, responseTo,nil)
+func (p *Peer) newPongMsg(to INode, responseTo *Message) (m *Message) {
+	m = p.NewMsg(to, DEVP2P_PONG, pongMsg, responseTo,nil)
 	return
 }
 
-func (p *Peer) sendPingMsg()  {
-	p.newPingMsg(p.node).send()
+func (p *Peer) SendPingMsg()  {
+	p.newPingMsg(p.Node()).Send()
 }
 
-func (p *Peer) sendPongMsg(pingMsg *Message)  {
-	p.newPongMsg(p.node, pingMsg).send()
+func (p *Peer) SendPongMsg(pingMsg IMessage)  {
+	msg := pingMsg.(*Message)
+	p.newPongMsg(p.Node(), msg).Send()
 }
 
 
 func (p *Peer) Log(a ...interface{}) {
-	if config.LogConfig.LogPeer {
-		util.Log(p.self(), p, a)
+	if LogConfig.LogPeer {
+		Log(p.Self(), p, a)
 	}
 }
 

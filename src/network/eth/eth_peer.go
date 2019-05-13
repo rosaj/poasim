@@ -1,6 +1,8 @@
-package network
+package eth
 
 import (
+	. "../../common"
+	. "../message"
 	"errors"
 	"fmt"
 	"math/big"
@@ -15,7 +17,14 @@ var (
 	errEthPeerClosed     = errors.New("ethPeer set is closed")
 	errAlreadyRegistered = errors.New("ethPeer is already registered")
 	errNotRegistered     = errors.New("ethPeer is not registered")
+	errDiscNetworkError  = errors.New("network error")
+	errDiscRequested     = errors.New("disconnect requested")
+	errDiscQuitting		 = errors.New("client quiting")
+	errDiscTooManyPeers  = errors.New("too many peers")
+
 )
+
+
 
 const (
 	maxKnownTxs    = 32768 // Maximum transactions hashes to keep in the known list (prevent DOS)
@@ -56,7 +65,7 @@ type propEvent struct {
 type ethPeer struct {
 	id ID
 
-	*Peer
+	IPeer
 
 	pm *ProtocolManager
 
@@ -75,9 +84,9 @@ type ethPeer struct {
 	// Termination channel to stop the broadcaster
 }
 
-func newPeer(version int, p *Peer, pm *ProtocolManager) *ethPeer {
+func newPeer(version int, p IPeer, pm *ProtocolManager) *ethPeer {
 	return &ethPeer{
-		Peer:        p,
+		IPeer:        p,
 		pm:          pm,
 		version:     version,
 		id:          p.ID(),
@@ -93,7 +102,7 @@ func newPeer(version int, p *Peer, pm *ProtocolManager) *ethPeer {
 // and transaction broadcasts into the remote ethPeer. The goal is to have an async
 // writer that does not lock up node internals.
 func (p *ethPeer) broadcast() {
-	if p.broadcasting || p.quit {
+	if p.broadcasting || p.IsClosed() {
 		return
 	}
 
@@ -162,8 +171,21 @@ func (p *ethPeer) MarkTransaction(hash common.Hash) {
 	p.knownTxs.Add(hash)
 }
 
+
+func (p *ethPeer) NewMsg(to INode, msgType string, content interface{}, responseTo *Message, handler func(m *Message))  *Message {
+
+	return NewMessage(p.Self(), to, msgType, content, 0,
+		handler, responseTo,
+		func(m *Message, err error) {
+			// bilo koji error gasi peer-a
+			p.HandleError(err)
+
+		}, 0)
+
+}
+
 func (p *ethPeer) send(msgType string, content interface{}, handler func(m *Message))  {
-	m := p.newMsg(p.node, msgType, content, nil,
+	m := p.NewMsg(p.Node(), msgType, content, nil,
 			func(m *Message) {
 
 				p.broadcasting = false
@@ -174,14 +196,14 @@ func (p *ethPeer) send(msgType string, content interface{}, handler func(m *Mess
 				if p.nodesEthPeer() != nil {
 					handler(m)
 				} else {
-					p.handleError(DiscNetworkError)
+					p.HandleError(errEthPeerClosed)
 				}
 
 			})
 
 	p.broadcasting = true
 
-	m.send()
+	m.Send()
 
 	return
 }
@@ -346,13 +368,14 @@ func (p *ethPeer) RequestReceipts(hashes []common.Hash) error {
 */
 
 func (p *ethPeer) nodesEthPeer() *ethPeer {
-	return p.node.server.pm.findPeer(p.self())
+	iPeer :=  p.Node().Server().GetProtocolManager().FindPeer(p.Self())
+	return iPeer.(*ethPeer)
 }
 
 
 
 func (p *ethPeer) Close(reason error)  {
-	p.Peer.Close(reason)
+	p.IPeer.Close(reason)
 }
 
 
@@ -360,24 +383,60 @@ func (p *ethPeer) Close(reason error)  {
 func (p *ethPeer) newEthMsg(msgType string, content interface{}, responseTo *Message,
 							handler func(m *Message), onResponse func(m *Message, err error), responseTimeout float64)  *Message {
 
-	m := newMessage(p.self(), p.node, msgType, content, 0,
+	m := NewMessage(p.Self(), p.Node(), msgType, content, 0,
 		handler, responseTo,
 		onResponse, responseTimeout)
 
 	return m
 }
+func (p *ethPeer) newStatusMsg(listener func(err error)) *Message  {
 
+	return p.newEthMsg(STATUS_MSG, StatusMsg, nil, func(m *Message) {
+
+		peer := p.Node().Server().GetProtocolManager().RetrieveHandshakePeer(p.Self())
+
+		if peer.(*ethPeer) != nil {
+			listener(nil)
+
+		} else {
+			listener(ErrMsgTimeout)
+		}
+
+	}, func(m *Message, err error) {
+		listener(err)
+	}, handshakeTimeout.Seconds())
+}
+
+// Handshake executes the eth protocol handshake, negotiating version number,
+// network IDs, difficulties, head and genesis blocks.
+func (p *ethPeer) Handshake(listener func(err error)) {
+	statusMsg := p.newStatusMsg(func(err error) {
+		if err == nil {
+			if p.pm.networkID != p.Node().GetNetworkID() {
+				err = ErrNetworkIdMismatch
+				p.HandleError(err)
+			}
+		}
+		listener(err)
+	})
+
+	statusMsg.Send()
+  }
+
+
+
+/*
 func (p *ethPeer) newStatusMsg(responseTo *Message, onResponse func(m *Message, err error)) *Message  {
 
 	return p.newEthMsg(STATUS_MSG, nil, responseTo, func(m *Message) {
-
-					peer := p.node.server.pm.findHandshakePeer(p.self())
+				//TODO: remove this node ne odogovara sa status nego samo salje
+					peer := p.Node().Server().ProtocolManager().FindHandshakePeer(p.Self())
 
 					if peer != nil {
-						peer.newStatusMsg(m, nil).send()
+						peer.newStatusMsg(m, nil).Send()
 
 					} else if onResponse != nil {
-						onResponse(nil, errMsgTimeout)
+						onResponse(nil, ErrMsgTimeout)
 					}
 
 			}, onResponse, handshakeTimeout.Seconds())
@@ -389,15 +448,33 @@ func (p *ethPeer) Handshake(onSuccess func()) {
 
 	statusMsg := p.newStatusMsg(nil, func(m *Message, err error) {
 
-		p.pm.deleteHandshakePeer(p.node)
+		p.pm.DeleteHandshakePeer(p.Node())
 
-		if p.handleError(err) {
+		if p.HandleError(err) {
 			onSuccess()
+			/*
+				&statusData{
+					ProtocolVersion: uint32(p.version),
+					NetworkId:       p.pm.networkID,
+					TD:              nil,
+					CurrentBlock:    nil,
+					GenesisBlock:    nil,
+				}
+
+			*/
+/*
+			if p.pm.networkID != p.Node().NetworkID {
+				p.HandleError(ErrNetworkIdMismatch)
+			} else {
+				onSuccess()
+			}
+
 		}
 	})
 
-	statusMsg.send()
+	statusMsg.Send()
 }
+*/
 
 
 
@@ -451,7 +528,7 @@ func (ps *peerSet) Unregister(id ID) error {
 	}
 	delete(ps.peers, id)
 
-	p.Close(DiscRequested)
+	p.Close(errDiscRequested)
 
 	return nil
 }
@@ -516,7 +593,8 @@ func (ps *peerSet) BestPeer() *ethPeer {
 func (ps *peerSet) Close() {
 
 	for _, p := range ps.peers {
-		p.Disconnect(DiscQuitting)
+		p.Disconnect(errDiscQuitting)
 	}
 	ps.closed = true
 }
+

@@ -1,8 +1,9 @@
-package network
+package discovery
 
 import (
-	"../config"
-	"../util"
+	. "../../common"
+	. "../../config"
+	. "../../util"
 	"bytes"
 	crand "crypto/rand"
 )
@@ -11,7 +12,7 @@ type DB struct {
 	fails map[ID]int
 	lastPingReceived map[ID]float64
 	lastPongReceived map[ID]float64
-	lastLiveNodes []*Node
+	lastLiveNodes []INode
 }
 
 
@@ -29,32 +30,32 @@ func newDB() *DB{
 
 
 
-func (db *DB) FindFails(n *Node) int {
+func (db *DB) FindFails(n INode) int {
 	return db.fails[n.ID()]
 }
-func (db *DB) UpdateFindFails(n *Node, fails int)  {
+func (db *DB) UpdateFindFails(n INode, fails int)  {
 	db.fails[n.ID()] = fails
 }
 
-func (db *DB) UpdateLastPingReceived(n *Node, time float64)  {
+func (db *DB) UpdateLastPingReceived(n INode, time float64)  {
 	db.lastPingReceived[n.ID()] = time
 }
 
-func (db *DB) LastPingReceived(n *Node) float64 {
+func (db *DB) LastPingReceived(n INode) float64 {
 	return db.lastPingReceived[n.ID()]
 }
 
-func (db *DB) UpdateLastPongReceived(n *Node, time float64) ()  {
+func (db *DB) UpdateLastPongReceived(n INode, time float64) ()  {
 	db.lastPongReceived[n.ID()] = time
 }
 
-func (db *DB) LastPongReceived(n *Node) float64 {
+func (db *DB) LastPongReceived(n INode) float64 {
 	return db.lastPongReceived[n.ID()]
 }
 
 
 
-func findNode(nodes []*Node, id ID) *Node {
+func findNode(nodes []INode, id ID) INode {
 	var key = id[:]
 
 	for _, n := range nodes {
@@ -70,10 +71,10 @@ func findNode(nodes []*Node, id ID) *Node {
 
 // QuerySeeds retrieves random nodes to be used as potential seed nodes
 // for bootstrapping.
-func (db *DB) QuerySeeds(n int) []*Node {
+func (db *DB) QuerySeeds(n int) []INode {
 
 	var (
-		nodes = make([]*Node, 0, n)
+		nodes = make([]INode, 0, n)
 		id    ID
 	)
 
@@ -106,8 +107,8 @@ seek:
 	}
 
 
-	if config.LogConfig.LogDiscovery {
-		util.Log("Queryed", len(nodes), "from", len(db.lastLiveNodes))
+	if LogConfig.LogDiscovery {
+		Log("Queryed", len(nodes), "from", len(db.lastLiveNodes))
 	}
 
 	db.lastLiveNodes = nil

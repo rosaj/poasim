@@ -21,11 +21,3 @@ func PublicKeyToId(pubKey *ecdsa.PublicKey) []byte {
 	math.ReadBits(pubKey.Y, buf[32:])
 	return crypto.Keccak256(buf)
 }
-
-func EncodePubKey(key *ecdsa.PublicKey) encPubkey {
-	var e encPubkey
-	math.ReadBits(key.X, e[:len(e)/2])
-	math.ReadBits(key.Y, e[len(e)/2:])
-	return e
-}
-

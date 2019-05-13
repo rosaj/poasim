@@ -1,8 +1,18 @@
-package network
+package protocol
 
 import (
+	. "../../common"
 	"fmt"
 )
+
+
+var(
+
+	ETH = "eth"
+	OTHER = "_"
+)
+
+
 
 // Protocol represents a P2P subprotocol implementation.
 type Protocol struct {
@@ -24,9 +34,9 @@ type Protocol struct {
 	// The ethPeer connection is closed when Start returns. It should return
 	// any protocol-level error (such as an I/O error) that is
 	// encountered.
-	Run func(peer *Peer)
+	RunFunc func(peer IPeer)
 
-	Close func(peer *Peer)
+	CloseFunc func(peer IPeer)
 /*
 	// NodeInfo is an optional helper method to retrieve protocol specific metadata
 	// about the host node.
@@ -42,6 +52,17 @@ type Protocol struct {
 	*/
 }
 
+func (p *Protocol) Run(peer IPeer) {
+	p.RunFunc(peer)
+}
+
+func (p *Protocol) Close(peer IPeer) {
+	p.CloseFunc(peer)
+}
+
+func (p *Protocol) GetName() string {
+	return p.Name
+}
 
 func (p *Protocol) String() string {
 	return fmt.Sprintf("%s/%d", p.Name, p.Version)

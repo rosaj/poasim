@@ -1,8 +1,10 @@
-package network
+package discovery
 
 
 import (
-	"../util"
+	. "../../common"
+	. "../../network/message"
+	"../../util"
 	"errors"
 	"github.com/agoussia/godes"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -63,47 +65,47 @@ type (
 type packet interface {
 	msg() *Message
 	// preverify checks whether the packet is valid and should be handled at all.
-	preverify(t *udp, from *Node) bool
+	preverify(t *UDP, from INode) bool
 	// handle handles the packet.
-	handle(t *udp, from *Node)
+	handle(t *UDP, from INode)
 }
 
-// udp implements the discovery v4 UDP wire protocol.
-type udp struct {
-	node	    *Node
+// UDP implements the discovery v4 UDP wire protocol.
+type UDP struct {
+	node	    INode
 	db          *DB
 	tab         *Table
 }
 
 
-func newUDP(node *Node) (*Table, *udp) {
-	udp := &udp{
+func NewUDP(node INode) (*Table, *UDP) {
+	udp := &UDP{
 		node:       	 node,
 		db:              newDB(),
 	}
-	tab := newTable(udp, node.bootstrapNodes)
+	tab := newTable(udp, node.GetBootstrapNodes())
 	udp.tab = tab
 
 	return udp.tab, udp
 }
 
-func (t *udp) self() *Node {
+func (t *UDP) self() INode {
 	return t.node
 }
 
 
-func (t *udp) findnode(node *Node, targetKey encPubkey, onResponse func(nodes *nodesByDistance, err error))  {
+func (t *UDP) findnode(node INode, targetKey encPubkey, onResponse func(nodes *nodesByDistance, err error))  {
 
 	if godes.GetSystemTime() - t.db.LastPingReceived(node) > bondExpiration.Seconds(){
 
-		t.self().sendPingPackage(node, func(m *Message, err error) {
+		sendPingPackage(t.self(), node, func(m *Message, err error) {
 			// Wait for them to ping back and process our pong.
 			godes.Advance(respTimeout.Seconds())
 
-			t.self().sendFindNodePackage(node, targetKey, onResponse)
+			sendFindNodePackage(t.self(), node, targetKey, onResponse)
 		})
 	}else{
-		t.self().sendFindNodePackage(node, targetKey, onResponse)
+		sendFindNodePackage(t.self(), node, targetKey, onResponse)
 	}
 }
 
@@ -120,8 +122,9 @@ func isMsgValid(m *Message) bool {
 
 func handlePacket(p packet)  {
 	msg := p.msg()
-	if p.preverify(msg.To.udp, msg.From) {
-		p.handle(msg.To.udp, msg.From)
+	t := msg.To.GetUDP().(*UDP)
+	if p.preverify(t, msg.From) {
+		p.handle(t, msg.From)
 	}
 }
 
@@ -129,21 +132,21 @@ func (req *ping) msg() *Message {
 	return req.Message
 }
 
-func (req *ping) preverify(t *udp, from *Node) bool  {
+func (req *ping) preverify(t *UDP, from INode) bool  {
 	return isMsgValid(req.Message)
 }
 
 
-func (req *ping) handle(t *udp, from *Node) {
+func (req *ping) handle(t *UDP, from INode) {
 
 	// Reply
-	req.To.sendPongPackage(req.From, req.Message)
+	sendPongPackage(req.To, req.From, req.Message)
 
 
 	// Ping back if our last sendPongPackage on file is too far in the past.
 	if godes.GetSystemTime() - t.db.LastPongReceived(from) > bondExpiration.Seconds() {
 
-		t.self().sendPingPackage(from, func(m *Message, err error) {
+		sendPingPackage(t.self(), from, func(m *Message, err error) {
 			t.tab.addVerifiedNode(from)
 		})
 	} else {
@@ -159,12 +162,12 @@ func (req *pong) msg() *Message {
 	return req.Message
 }
 
-func (req *pong) preverify(t *udp, from *Node) bool {
+func (req *pong) preverify(t *UDP, from INode) bool {
 	if !isMsgValid(req.Message){
 		return false
 	}
 
-	if req.Message.responseTo == nil {
+	if req.Message.ResponseTo == nil {
 		util.Log("unsolicited reply: ", req.Message)
 		return false
 	}
@@ -172,7 +175,7 @@ func (req *pong) preverify(t *udp, from *Node) bool {
 	return true
 }
 
-func (req *pong) handle(t *udp, from *Node) {
+func (req *pong) handle(t *UDP, from INode) {
 	t.db.UpdateLastPongReceived(from, godes.GetSystemTime())
 }
 
@@ -181,7 +184,7 @@ func (req *findnode) msg() *Message {
 	return req.Message
 }
 
-func (req *findnode) preverify(t *udp, from *Node) bool {
+func (req *findnode) preverify(t *UDP, from INode) bool {
 	if !isMsgValid(req.Message){
 		return false
 	}
@@ -199,26 +202,26 @@ func (req *findnode) preverify(t *udp, from *Node) bool {
 	return true
 }
 
-func (req *findnode) handle(t *udp, from *Node) {
+func (req *findnode) handle(t *UDP, from INode) {
 	// Determine closest nodes.
 	Target := req.Content.(encPubkey)
 	target := ID(crypto.Keccak256Hash(Target[:]))
 
 	closest := t.tab.closest(target, bucketSize).entries
 	
-	req.To.sendNeighborsPackage(from, &nodesByDistance{closest, target}, req.Message)
+	sendNeighborsPackage(req.To, from, &nodesByDistance{closest, target}, req.Message)
 }
 
 
 func (req *neighbors) msg() *Message {
 	return req.Message
 }
-func (req *neighbors) preverify(t *udp, from *Node) bool {
+func (req *neighbors) preverify(t *UDP, from INode) bool {
 	if !isMsgValid(req.Message){
 		return false
 	}
 
-	if req.Message.responseTo == nil {
+	if req.Message.ResponseTo == nil {
 		util.Log("unsolicited reply: ", req.Message)
 		return false
 	}
@@ -226,23 +229,23 @@ func (req *neighbors) preverify(t *udp, from *Node) bool {
 	return true
 }
 
-func (req *neighbors) handle(t *udp, from *Node) {
+func (req *neighbors) handle(t *UDP, from INode) {
 
 }
 
 
-func (n *Node) sendPingPackage(node *Node, onResponse func(m *Message, err error)){
-	msg := newPingMessage(n, node, onResponse)
-	msg.send()
+func sendPingPackage(from INode, to INode, onResponse func(m *Message, err error)){
+	msg := newPingMessage(from, to, onResponse)
+	msg.Send()
 }
 
-func (n *Node) sendPongPackage(node *Node, responseToPingMsg *Message)  {
-	msg := newPongMessage(n, node, responseToPingMsg)
-	msg.send()
+func sendPongPackage(from INode, to INode, responseToPingMsg *Message)  {
+	msg := newPongMessage(from, to, responseToPingMsg)
+	msg.Send()
 }
 
-func (n *Node) sendFindNodePackage(node *Node, pubkey encPubkey, onResponse func(nodes *nodesByDistance, err error))  {
-	msg := newFindNodeMessage(n, node, pubkey, func(m *Message, err error) {
+func sendFindNodePackage(from INode, to INode, pubkey encPubkey, onResponse func(nodes *nodesByDistance, err error))  {
+	msg := newFindNodeMessage(from, to, pubkey, func(m *Message, err error) {
 
 		if onResponse != nil {
 			var nodes *nodesByDistance = nil
@@ -253,12 +256,12 @@ func (n *Node) sendFindNodePackage(node *Node, pubkey encPubkey, onResponse func
 		}
 
 	})
-	msg.send()
+	msg.Send()
 }
 
-func (n *Node) sendNeighborsPackage(node *Node, nodes *nodesByDistance, responseToMsg *Message)()  {
-	msg := newNeighborsMessage(n, node, nodes, responseToMsg)
-	msg.send()
+func sendNeighborsPackage(from INode, to INode, nodes *nodesByDistance, responseToMsg *Message)()  {
+	msg := newNeighborsMessage(from, to, nodes, responseToMsg)
+	msg.Send()
 }
 
 
@@ -269,8 +272,8 @@ func getExpirationTime() float64  {
 	return godes.GetSystemTime() + expiration.Seconds()
 }
 
-func newPingMessage(from *Node, to *Node, onResponse func(m *Message, err error)) *Message {
-	return newMessage(from, to, PING, PING, getExpirationTime(),
+func newPingMessage(from INode, to INode, onResponse func(m *Message, err error)) *Message {
+	return NewMessage(from, to, PING, PING, getExpirationTime(),
 			func(m *Message) {
 				handlePacket(&ping{m})
 			},
@@ -278,8 +281,8 @@ func newPingMessage(from *Node, to *Node, onResponse func(m *Message, err error)
 			respTimeout.Seconds())
 }
 
-func newPongMessage(from *Node, to *Node, responseTo *Message) *Message  {
-	return newMessage(from, to, PONG, PONG, getExpirationTime(),
+func newPongMessage(from INode, to INode, responseTo *Message) *Message  {
+	return NewMessage(from, to, PONG, PONG, getExpirationTime(),
 			func(m *Message) {
 				handlePacket(&pong{m})
 			},
@@ -288,8 +291,8 @@ func newPongMessage(from *Node, to *Node, responseTo *Message) *Message  {
 }
 
 
-func newFindNodeMessage(from *Node, to *Node, pubkey encPubkey, onResponse func(m *Message, err error)) *Message  {
-	return newMessage(from, to, FINDNODE, pubkey,getExpirationTime(),
+func newFindNodeMessage(from INode, to INode, pubkey encPubkey, onResponse func(m *Message, err error)) *Message  {
+	return NewMessage(from, to, FINDNODE, pubkey,getExpirationTime(),
 			func(m *Message) {
 				handlePacket(&findnode{m})
 			},
@@ -297,8 +300,8 @@ func newFindNodeMessage(from *Node, to *Node, pubkey encPubkey, onResponse func(
 			respTimeout.Seconds())
 }
 
-func newNeighborsMessage(from *Node, to *Node, nodes *nodesByDistance, responseToMsg *Message) *Message  {
-	return newMessage(from, to, NEIGHBORS, nodes,getExpirationTime(),
+func newNeighborsMessage(from INode, to INode, nodes *nodesByDistance, responseToMsg *Message) *Message  {
+	return NewMessage(from, to, NEIGHBORS, nodes,getExpirationTime(),
 			func(m *Message) {
 				handlePacket(&neighbors{m})
 			},

@@ -1,8 +1,9 @@
-package network
+package message
 
 import (
-	"../config"
-	"../util"
+	. "../../common"
+	"../../config"
+	"../../util"
 	"errors"
 	"fmt"
 	"github.com/agoussia/godes"
@@ -11,9 +12,9 @@ import (
 
 
 var (
-	errMsgTimeout          = errors.New("msg timeout")
-	errNodeOffline		   = errors.New("node offline")
-	errPacketLost		   = errors.New("packet lost")
+	ErrMsgTimeout  = errors.New("msg timeout")
+	ErrNodeOffline = errors.New("node offline")
+	ErrPacketLost  = errors.New("packet lost")
 )
 
 var (
@@ -23,8 +24,9 @@ var (
 	NEIGHBORS	= "NEIGHBORS"
 
 
-	DEVP2P_PING	= "DEVP2P_PING"
-	DEVP2P_PONG	= "DEVP2P_PING"
+	DEVP2P_HANDSHAKE 	= "DEVP2P_HANDSHAKE"
+	DEVP2P_PING			= "DEVP2P_PING"
+	DEVP2P_PONG			= "DEVP2P_PONG"
 
 
 	// eth protocol message codes
@@ -53,8 +55,8 @@ type Message struct {
 	godes.Runner
 	Type    string
 	Content interface{}
-	From    *Node
-	To      *Node
+	From    INode
+	To      INode
 
 	Expiration float64
 	//TODO: poruka ima velicinu i latencija ovisi o velicini
@@ -63,7 +65,7 @@ type Message struct {
 	handler    func(m *Message)
 	onResponse func(m *Message, err error)
 
-	responseTo *Message
+	ResponseTo *Message
 
 	responseTimeout float64
 }
@@ -87,18 +89,18 @@ func (m *Message) Run() {
 
 		m.To.MarkMessageReceived(m)
 	} else {
-		m.handleError(errMsgTimeout)
-		m.Type = "RECIEVE_ERR"
-		m.To.MarkMessageReceived(m)
+		m.handleError(ErrMsgTimeout)
+		//m.Type = "RECIEVE_ERR"
+		//m.To.MarkMessageReceived(m)
 
 	}
 
 }
 
 
-func newMessage(
-	from *Node,
-	to *Node,
+func NewMessage(
+	from INode,
+	to INode,
 	msgType string,
 	content interface{},
 	expiration float64,
@@ -108,28 +110,29 @@ func newMessage(
 	responseTimeout float64) (m *Message) {
 
 	m = &Message{
-		Runner: godes.Runner{},
-		Type: msgType,
-		Content: content,
-		From: from,
-		To: to,
-		Expiration: expiration,
-		handler: handler,
-		onResponse: onResponse,
-		responseTo: responseTo,
+		Runner:          godes.Runner{},
+		Type:            msgType,
+		Content:         content,
+		From:            from,
+		To:              to,
+		Expiration:      expiration,
+		handler:         handler,
+		onResponse:      onResponse,
+		ResponseTo:      responseTo,
 		responseTimeout: responseTimeout,
 	}
 
 	return
 }
 
-func (m *Message) send() {
+func (m *Message) Send() {
 
 	if !m.From.IsOnline() {
-		m.handleError(errNodeOffline)
+		m.handleError(ErrNodeOffline)
 
-		m.Type = "SEND_ERR"
-		m.From.MarkMessageSend(m)
+
+	//	m.Type = "SEND_ERR"
+	//	m.From.MarkMessageSend(m)
 
 		return
 	}
@@ -161,13 +164,13 @@ func (m *Message) handleError(err error)  {
 
 func (m *Message) responded() {
 
-	if m.responseTo != nil && m.responseTo.onResponse != nil {
+	if m.ResponseTo != nil && m.ResponseTo.onResponse != nil {
 
 		if config.LogConfig.LogMessages {
-			util.Log("Responded to msg:", m.responseTo, "with:", m)
+			util.Log("Responded to msg:", m.ResponseTo, "with:", m)
 		}
 
-		m.responseTo.onResponse(m, nil)
+		m.ResponseTo.onResponse(m, nil)
 	}
 
 }
@@ -182,7 +185,9 @@ func (m *Message) HasExpired() (expired bool) {
 func (m *Message) GetLatency() float64 {
 	return m.latency
 }
-
+func (m *Message) GetType() string {
+	return m.Type
+}
 func (m *Message) logSent() {
 	if config.LogConfig.LogMessages {
 		util.Log("Send message:", m)

@@ -1,8 +1,12 @@
-package network
+package eth
 
 import (
-	"../util"
-	"../config"
+	. "../../common"
+	. "../../config"
+	. "../../util"
+//	ethCore "../eth/core"
+	. "../message"
+	. "../protocol"
 	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
@@ -38,17 +42,16 @@ var (
 // errIncompatibleConfig is returned if the requested protocols and configs are
 // not compatible (low protocol version restrictions and high requirements).
 var errIncompatibleConfig = errors.New("incompatible configuration")
-
+/*
 func errResp(code errCode, format string, v ...interface{}) error {
 	return fmt.Errorf("%v - %v", code, fmt.Sprintf(format, v...))
 }
+*/
 
 type ProtocolManager struct {
-	srv *Server
+	srv IServer
 
-
-
-	networkID uint64
+	networkID int
 
 	fastSync  uint32 // Flag whether fast sync is enabled (gets disabled if we already have blocks)
 	acceptTxs uint32 // Flag whether we're considered synchronised (enables transaction processing)
@@ -66,7 +69,7 @@ type ProtocolManager struct {
 	peers      *peerSet
 	handshakePeers *peerSet
 
-	SubProtocols []Protocol
+	SubProtocols []IProtocol
 
 	txsCh         chan core.NewTxsEvent
 	txsSub        event.Subscription
@@ -77,52 +80,78 @@ type ProtocolManager struct {
 	// channels for fetcher, syncer, txsyncLoop
 	newPeerCh   chan *ethPeer
 	quitSync    chan struct{}
-	noMorePeers chan struct{}
 
 }
 
+
 // NewProtocolManager returns a new Ethereum sub protocol manager. The Ethereum sub protocol manages peers capable
 // with the Ethereum network.
-func NewProtocolManager(srv *Server) *ProtocolManager {
+func NewProtocolManager(srv IServer) *ProtocolManager {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
 		srv:	srv,
-		networkID:   1,
+	//	txpool: 	 ethCore.NewTxPool(nil, nil),
+		networkID:   srv.Self().GetNetworkID(),
 		peers:       newPeerSet(),
 		handshakePeers: newPeerSet(),
 		newPeerCh:   make(chan *ethPeer),
-		noMorePeers: make(chan struct{}),
 		quitSync:    make(chan struct{}),
-		maxPeers:  srv.MaxPeers,
+		maxPeers:  	 srv.Self().GetMaxPeers(),
 	}
 
 
 	// Initiate a sub-protocol for every implemented version we can handle
-	manager.SubProtocols = make([]Protocol, 0)
+	manager.SubProtocols = make([]IProtocol, 0)
 
 
-	manager.SubProtocols = append(manager.SubProtocols, Protocol{
-		Name:    ProtocolName,
-		Version: 63,
-		Length:  ProtocolLengths[0],
-		Run: func(p *Peer) {
-			peer := newPeer(63, p, manager)
-			manager.handle(peer)
-		},
-		Close: func(peer *Peer) {
-			manager.removePeer(peer)
-		},
-	})
+	if containsProtocol(srv.Self().GetProtocols(), ETH) {
+
+		manager.SubProtocols = append(manager.SubProtocols, &Protocol{
+			Name:    ProtocolName,
+			Version: 63,
+			Length:  ProtocolLengths[0],
+			RunFunc: func(p IPeer) {
+				peer := newPeer(63, p, manager)
+				manager.handle(peer)
+			},
+			CloseFunc: func(peer IPeer) {
+				manager.removePeer(peer)
+			},
+		})
+
+	}
+
 
 	return manager
 }
 
-func (pm *ProtocolManager) self() *Node  {
-	return pm.srv.node
+func containsProtocol(protoNames []string, val string)  bool {
+
+	for _, v := range protoNames {
+		if val == v {
+			return true
+		}
+	}
+
+	return false
 }
 
+func (pm *ProtocolManager) self() INode  {
+	return pm.srv.Self()
+}
 
-func (pm *ProtocolManager) removePeer(p *Peer) {
+func (pm *ProtocolManager) GetSubProtocols() []IProtocol {
+
+	protos := make([]IProtocol, 0)
+
+	for _, proto := range pm.SubProtocols {
+		protos = append(protos, proto)
+	}
+
+	return protos
+}
+
+func (pm *ProtocolManager) removePeer(p IPeer) {
 	// Short circuit if the peer was already removed
 	peer := pm.peers.Peer(p.ID())
 	if peer == nil {
@@ -154,7 +183,7 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 	//go pm.txsyncLoop()
 }
 
-func (pm *ProtocolManager) findPeer(node *Node) *ethPeer  {
+func (pm *ProtocolManager) FindPeer(node INode) IPeer  {
 
 	if pm.peers.closed {
 		return nil
@@ -162,13 +191,11 @@ func (pm *ProtocolManager) findPeer(node *Node) *ethPeer  {
 
 	return pm.peers.Peer(node.ID())
 }
-
-func (pm *ProtocolManager) findHandshakePeer(node *Node) *ethPeer {
+func (pm *ProtocolManager) RetrieveHandshakePeer(node INode) IPeer  {
+	defer pm.handshakePeers.Delete(node.ID())
 	return pm.handshakePeers.Peer(node.ID())
 }
-func (pm *ProtocolManager) deleteHandshakePeer(node *Node)  {
-	pm.handshakePeers.Delete(node.ID())
-}
+
 
 func (pm *ProtocolManager) Stop() {
 	pm.log("Stopping Ethereum protocol")
@@ -176,9 +203,6 @@ func (pm *ProtocolManager) Stop() {
 	pm.txsSub.Unsubscribe()        // quits txBroadcastLoop
 	pm.minedBlockSub.Unsubscribe() // quits blockBroadcastLoop
 
-	// Quit the sync loop.
-	// After this send has completed, no new peers will be accepted.
-	pm.noMorePeers <- struct{}{}
 
 	// Quit fetcher, txsyncLoop.
 	close(pm.quitSync)
@@ -200,8 +224,8 @@ func (pm *ProtocolManager) handle(p *ethPeer) {
 	// Ignore maxPeers if this is a trusted peer
 	if pm.peers.Len() >= pm.maxPeers /* && !p.Peer.Info().Network.Trusted*/ {
 
-		p.Log("Ethereum error connecting to peer", DiscTooManyPeers)
-		p.handleError(DiscTooManyPeers)
+		p.Log("Ethereum error connecting to peer", errDiscTooManyPeers)
+		p.HandleError(errDiscTooManyPeers)
 	}
 
 	// dodaj peer u trenutne handshake peer-ove kako bi se moglo provjerit
@@ -210,13 +234,17 @@ func (pm *ProtocolManager) handle(p *ethPeer) {
 
 	p.Log("Ethereum peer connected")
 
-	p.Handshake(func() {
+	p.Handshake(func(err error) {
+		if err != nil {
+			p.Log("Ethereum handshake failed", "err", err)
+			return
+		}
 
 		// Register the peer locally
-		err := pm.peers.Register(p)
+		err = pm.peers.Register(p)
 		if err != nil {
 			p.Log("Ethereum peer registration failed", "err", err)
-			p.handleError(err)
+			p.HandleError(err)
 		}
 	})
 
@@ -227,16 +255,16 @@ func (pm *ProtocolManager) HandleTxMsg(p *ethPeer, m *Message)  {
 
 	txs := m.Content.(types.Transactions)
 
-	for i, tx := range txs {
+	for _, tx := range txs {
 		// Validate and mark the remote transaction
 		if tx == nil {
-			p.handleError(errResp(ErrDecode, "transaction %d is nil", i))
+			p.HandleError(ErrDecode)//errResp(ErrDecode, "transaction %d is nil", i)
 			return
 		}
 		p.MarkTransaction(tx.Hash())
 	}
-//	p.pm.txpool.AddRemotes(txs)
-	p.pm.BroadcastTxs(txs)
+
+	pm.txpool.AddRemotes(txs)
 }
 
 
@@ -384,7 +412,7 @@ func (pm *ProtocolManager) txBroadcastLoop() {
 // NodeInfo represents a short summary of the Ethereum sub-protocol metadata
 // known about the host peer.
 type NodeInfo struct {
-	Network    uint64              `json:"network"`    // Ethereum network ID (1=Frontier, 2=Morden, Ropsten=3, Rinkeby=4)
+	Network    int              `json:"network"`    // Ethereum network ID (1=Frontier, 2=Morden, Ropsten=3, Rinkeby=4)
 	Difficulty *big.Int            `json:"difficulty"` // Total difficulty of the host's blockchain
 	Genesis    common.Hash         `json:"genesis"`    // SHA3 hash of the host's genesis block
 	Config     *params.ChainConfig `json:"config"`     // Chain configuration for the fork rules
@@ -412,7 +440,7 @@ func (pm *ProtocolManager) String() string {
 }
 
 func (pm *ProtocolManager) log(a ...interface{})  {
-	if config.LogConfig.LogPeer {
-		util.Log(pm, a)
+	if LogConfig.LogPeer {
+		Log(pm, a)
 	}
 }

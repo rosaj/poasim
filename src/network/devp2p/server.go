@@ -1,8 +1,10 @@
-package network
+package devp2p
 
 import (
-	"../config"
-	"../util"
+	. "../../common"
+	. "../../config"
+	"../../network/eth"
+	. "../../util"
 
 	"errors"
 	"fmt"
@@ -30,28 +32,28 @@ type Config struct {
 	// DialRatio controls the ratio of inbound to dialed connections.
 	// Example: a DialRatio of 2 allows 1/2 of connections to be dialed.
 	// Setting DialRatio to zero defaults it to 3.
-	DialRatio int `toml:",omitempty"`
+	DialRatio int
 
 	// NoDiscovery can be used to disable the peer discovery mechanism.
 	// Disabling is useful for protocol debugging (manual topology).
 	NoDiscovery bool
 
-	// BootstrapNodes are used to establish connectivity
+	// BootstrapINodes are used to establish connectivity
 	// with the rest of the network.
-	BootstrapNodes []*Node
+	BootstrapINodes []INode
 
-	// Static nodes are used as pre-configured connections which are always
+	// Static INodes are used as pre-configured connections which are always
 	// maintained and re-connected on disconnects.
-	StaticNodes []*Node
+	StaticINodes []INode
 
-	// Trusted nodes are used as pre-configured connections which are always
+	// Trusted INodes are used as pre-configured connections which are always
 	// allowed to connect, even above the peer limit.
-	TrustedNodes []*Node
+	TrustedINodes []INode
 
 	// Protocols should contain the protocols supported
 	// by the server. Matching protocols are launched for
 	// each peer.
-	Protocols []Protocol
+	Protocols []IProtocol
 
 	// If NoDial is true, the server will not dial any peers.
 	NoDial bool
@@ -63,44 +65,73 @@ type Server struct {
 	// Config fields may not be modified while the server is running.
 	Config
 
-	node			*Node
+	node			INode
 
 	running 		bool
 
-	ntab        	*Table
+	ntab        	IDiscoverTable
 	lastLookup  	float64
 
 	peers       	map[ID]*Peer
+	handshakePeers  map[ID]*Peer
 	inboundCount	int
 
 	refreshFunc 	func()
+	quitFunc		func()
 
-	pm				*ProtocolManager
+	pm				IProtocolManager
 
 	peerStats		map[float64][]int
 }
 
 
+func NewServer(node INode) *Server {
+	srv :=  &Server{
+				node: node,
+				peers: make(map[ID]*Peer),
+				handshakePeers: make(map[ID]*Peer),
+				peerStats: make(map[float64][]int),
+				Config : Config {
+					MaxPeers: node.GetMaxPeers(),
+					DialRatio: node.GetDialRatio(),
+					BootstrapINodes: node.GetBootstrapNodes(),
+				},
+			}
 
-func NewServer(node *Node) *Server {
-	return &Server{
-		node: node,
-		peers: make(map[ID]*Peer),
-		peerStats: make(map[float64][]int),
-		Config : Config {
-			MaxPeers: config.SimConfig.MaxPeers,
-			BootstrapNodes: node.bootstrapNodes,
-		},
-	}
+
+	srv.pm = eth.NewProtocolManager(srv)
+	srv.Protocols = srv.pm.GetSubProtocols()
+
+	return srv
 }
-
+/*
 func (srv *Server) ProtocolManager() *ProtocolManager {
 	return srv.pm
 }
+ */
 
-// Self returns the local node's endpoint information.
-func (srv *Server) Self() *Node {
+// Self returns the local INode's endpoint information.
+func (srv *Server) Self() INode {
 	return srv.node
+}
+
+
+func (srv *Server) GetProtocols() []IProtocol {
+	return srv.Protocols
+}
+
+func (srv *Server) GetProtocolManager() IProtocolManager {
+	return srv.pm
+}
+
+func (srv *Server) SetOnline(online bool)  {
+
+	if online {
+		srv.Start()
+	} else {
+		srv.Stop()
+	}
+
 }
 
 // Stop terminates the server and all active peer connections.
@@ -110,10 +141,13 @@ func (srv *Server) Stop() {
 	if !srv.running {
 		return
 	}
+	srv.log("Stopping...")
+
 	srv.running = false
 
-	//TODO: pogleda ovo dali je ok dole
-	srv.ntab.Close()
+	if srv.quitFunc != nil {
+		srv.quitFunc()
+	}
 
 	// Disconnect all peers.
 	for _, p := range srv.peers {
@@ -130,15 +164,14 @@ func (srv *Server) Start() {
 		return
 	}
 
-	srv.running = true
+	srv.log("Starting...")
 
-	srv.pm = NewProtocolManager(srv)
-	srv.Protocols = srv.pm.SubProtocols
+	srv.running = true
 
 	srv.setupDiscovery()
 
 	dynPeers := srv.maxDialedConns()
-	dialer := newDialState(srv.Self().ID(), srv.StaticNodes, srv.BootstrapNodes, srv.ntab, dynPeers)
+	dialer := newDialState(srv.Self().ID(), srv.StaticINodes, srv.BootstrapINodes, srv.ntab, dynPeers)
 
 	srv.log("DynPeers:", dynPeers)
 	srv.run(dialer)
@@ -146,15 +179,15 @@ func (srv *Server) Start() {
 
 
 func (srv *Server) setupDiscovery() {
-	srv.ntab = srv.Self().tab
+	srv.ntab = srv.Self().GetDiscoveryTable()
 }
 
 
 type dialer interface {
 	newTasks(running int, peers map[ID]*Peer, now float64) []task
 	taskDone(task, float64)
-	addStatic(*Node)
-	removeStatic(*Node)
+	addStatic(INode)
+	removeStatic(INode)
 }
 
 
@@ -172,15 +205,15 @@ func (srv *Server) run(dialstate dialer) {
 	srv.log("Started P2P networking")
 
 	var (
-		trusted      = make(map[ID]bool, len(srv.TrustedNodes))
+		trusted      = make(map[ID]bool, len(srv.TrustedINodes))
 		//taskdone     = make(chan task, maxActiveDialTasks)
 		runningTasks []task
 		queuedTasks  []task // tasks that can't run yet
 		onTaskDone	 func(task task)
 	)
-	// Put trusted nodes into a map to speed up checks.
+	// Put trusted INodes into a map to speed up checks.
 	// Trusted peers are loaded on startup or added via AddTrustedPeer RPC.
-	for _, n := range srv.TrustedNodes {
+	for _, n := range srv.TrustedINodes {
 		trusted[n.ID()] = true
 	}
 
@@ -223,13 +256,26 @@ func (srv *Server) run(dialstate dialer) {
 		scheduleTasks()
 	}
 
+	srv.quitFunc = func() {
+		srv.refreshFunc = nil
+
+		for _, task := range runningTasks {
+			StopTask(task)
+		}
+	}
+
+
 	onTaskDone = func(t task) {
 
-		srv.log("Dial task done", t)
-		dialstate.taskDone(t, godes.GetSystemTime())
-		delTask(t)
+		if srv.running {
 
-		scheduleTasks()
+			srv.log("Dial task done", t)
+			dialstate.taskDone(t, godes.GetSystemTime())
+			delTask(t)
+
+			scheduleTasks()
+
+		}
 	}
 
 	scheduleTasks()
@@ -241,48 +287,78 @@ func (srv *Server) run(dialstate dialer) {
 // SetupConn runs the handshakes and attempts to add the connection
 // as a peer. It returns when the connection has been added as a peer
 // or the handshakes have failed.
-func (srv *Server) SetupConn(flags connFlag, node *Node) error {
+func (srv *Server) SetupConn(flags connFlag, node INode) error {
 
 	peer := NewPeer(srv, node)
 	peer.flags = flags
 /*
-	if srv.trusted[node.ID()] {
+	if srv.trusted[INode.ID()] {
 		// Ensure that the trusted flag is set before checking against MaxPeers.
 		peer.flags |= trustedConn
 	}
 */
-	err := srv.setupConn(peer)
-	if err != nil {
-		srv.log("Setting up connection failed", peer, "err", err)
-	} else {
-		// ako je spojeno i ako smo se mi spojili na node onda posalji connection request da se on spoji na nas
-		if !peer.Inbound() {
-			node.server.SetupConn(inboundConn, srv.Self())
+	srv.setupConn(peer, func(err error) {
+		if err != nil {
+			srv.log("Setting up connection failed", peer, "err", err)
 		}
+	})
+
+	// ako smo se mi spojili na INode onda posalji connection request da se on spoji na nas
+	if !peer.Inbound() {
+		node.Server().SetupPeerConn(int32(inboundConn), srv.Self())
 	}
-	return err
+
+
+
+	return nil
 }
 
-func (srv *Server) setupConn(peer *Peer) error {
+func (srv *Server) SetupPeerConn(flags int32, node INode) error {
+	cf := connFlag(flags)
+	return srv.SetupConn(cf, node)
+}
 
-	util.Log(srv)
+func (srv *Server) setupConn(peer *Peer, onError func(err error)) {
+
 	if !srv.running {
-		return errServerStopped
+		onError(errServerStopped)
+		return
 	}
 
 	err := srv.encHandshakeChecks(peer)
 
 	if err != nil {
-		return err
+		onError(err)
+		return
 	}
 
-	err = srv.addPeer(peer)
-	if err != nil {
-		return err
-	}
+	srv.handshakePeers[peer.ID()] = peer
 
-	return nil
+	srv.log("Handshake peer", peer)
+
+	// Run the protocol handshake
+	peer.doProtoHandshake(func(err error) {
+
+		if err != nil {
+			onError(err)
+			return
+		}
+
+		err = srv.addPeer(peer)
+		if err != nil {
+			onError(err)
+			return
+		}
+
+	})
+
 }
+
+func (srv *Server) RetrieveHandshakePeer(node INode) IPeer {
+	defer delete(srv.handshakePeers, node.ID())
+	return srv.handshakePeers[node.ID()]
+}
+
 
 func (srv *Server) addPeer(peer *Peer) error {
 
@@ -292,7 +368,7 @@ func (srv *Server) addPeer(peer *Peer) error {
 	if err == nil {
 
 		// The handshakes are done and it passed all checks.
-		//p := newPeer(node, srv.Protocols)
+		//p := newPeer(INode, srv.Protocols)
 
 		srv.log("Adding p2p peer", peer, "peers", len(srv.peers)+1)
 
@@ -328,16 +404,18 @@ func (srv *Server) DeletePeer(p *Peer)  {
 	srv.logPeerStats()
 }
 
-func (srv *Server) FindPeer(node *Node) *Peer {
+func (srv *Server) FindPeer(node INode) IPeer {
 	return srv.peers[node.ID()]
 }
-
+func (srv *Server) PeerCount() int {
+	return len(srv.peers)
+}
 
 
 func (srv *Server) protoHandshakeChecks(p *Peer) error {
 	// Drop connections with no matching protocols.
 
-	if len(srv.Protocols) > 0 && countMatchingProtocols(srv, p.Server()) == 0 {
+	if len(srv.Protocols) > 0 && srv.countMatchingProtocols(p) == 0 {
 		return DiscUselessPeer
 	}
 	// Repeat the encryption handshake checks because the
@@ -379,33 +457,35 @@ func (srv *Server) String() string {
 }
 
 
-func countMatchingProtocols(server1 *Server, server2 *Server) int {
+func (srv *Server) countMatchingProtocols(p *Peer) int {
 	n := 0
-	n += 1
-	//TODO: ovdje bi mogla bit neka provjera pa da se ne spaja svaki puta na peer-a
-	/*
-	for _, cap := range caps {
-		for _, proto := range protocols {
-			if proto.Name == cap.Name && proto.Version == cap.Version {
+
+	for _, proto1 := range srv.Protocols {
+		for _, proto2 := range p.Node().Server().GetProtocols() {
+			if proto1.GetName() == proto2.GetName() {
 				n++
 			}
 		}
 	}
-	*/
+
 	return n
 }
 
 func (srv *Server) log(a ...interface{})  {
 
-	if config.LogConfig.LogServer {
-		util.Log("Server:", srv.Self(), a)
+	if LogConfig.LogServer {
+		Log("Server:", srv.Self(), a)
 	}
 
 }
 
 func (srv *Server) logPeerStats()  {
 
-	t := config.MetricConfig.GetTimeGroup()
+	t := MetricConfig.GetTimeGroup()
 	srv.peerStats[t] = append(srv.peerStats[t], len(srv.peers))
 
+}
+
+func (srv *Server) GetPeerStats() map[float64][]int {
+	return srv.peerStats
 }

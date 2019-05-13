@@ -1,7 +1,10 @@
 package network
 
 import (
-	"../config"
+	. "../common"
+	. "../config"
+	"../network/devp2p"
+	"../network/discovery"
 	"../util"
 	"crypto/ecdsa"
 	"github.com/agoussia/godes"
@@ -25,21 +28,32 @@ func nodeCountChanged(arrival bool)  {
 		onlineCounter -= 1
 	}
 
-	t := config.MetricConfig.GetTimeGroup()
+	t := MetricConfig.GetTimeGroup()
 	nodeStats[t] = append(nodeStats[t], onlineCounter)
+
+}
+
+type NodeConfig struct {
+
+	MaxPeers 		int
+
+	DialRatio 		int
+
+	BootstrapNodes 	[]*Node
+
+	NetworkID		int
+
+	Protocols		[]string
+
 
 }
 
 
 
-// ID is a unique identifier for each node.
-type ID [32]byte
-
-type encPubkey [64]byte
-
-
 type Node struct {
 	*godes.Runner
+
+	*NodeConfig
 
 	name            string
 	online          bool
@@ -50,14 +64,9 @@ type Node struct {
 
 	id ID
 
-	udp   	*udp
-	tab   	*Table
-	server	*Server
-
-
-	bootstrapNodes []*Node
-	addedAt        map[*Node]float64
-	livenessChecks map[*Node]uint
+	udp   	IUdp
+	tab   	IDiscoverTable
+	server	IServer
 
 	msgSent     map[string][]Msg
 	msgReceived map[string][]Msg
@@ -71,32 +80,31 @@ type Msg struct {
 
 var nodeCounter = 1
 
-func NewBootstrapNode(bootstrapNodes []*Node) (n *Node) {
-	bNode := NewNode(bootstrapNodes)
+func NewBootstrapNode(nodeConfig *NodeConfig) (n *Node) {
+	bNode := NewNode(nodeConfig)
 	bNode.isBootstrapNode = true
 	bNode.name = "BN_" + bNode.name
 	return bNode
 }
 
 
-func NewNode(bootstrapNodes []*Node) (n* Node) {
+func NewNode(nodeConfig *NodeConfig) (n* Node) {
 	n = new(Node)
 	n.Runner = &godes.Runner{}
+	n.NodeConfig = nodeConfig
+
 	n.name = string(strconv.Itoa(nodeCounter))
 	n.online = true
-	n.lifetime = config.SimConfig.NextNodeLifetime()
+	n.lifetime = SimConfig.NextNodeLifetime()
 	n.isBootstrapNode = false
 
 	n.publicKey = &NewKey().PublicKey
 	copy(n.id[:], PublicKeyToId(n.publicKey))
 
-	n.addedAt = make(map[*Node]float64)
-	n.livenessChecks = make(map[*Node]uint)
 	n.msgReceived = make(map[string][]Msg)
 	n.msgSent = make(map[string][]Msg)
 
 	//n.runFunction = fn
-	n.bootstrapNodes = bootstrapNodes
 
 	nodeCounter += 1
 	return
@@ -114,6 +122,31 @@ func (n *Node) ID() ID {
 	return n.id
 }
 
+func (n *Node) GetMaxPeers() int {
+	return n.MaxPeers
+}
+
+func (n *Node) GetDialRatio() int {
+	return n.DialRatio
+}
+
+func (n *Node) GetBootstrapNodes() []INode {
+	bNodes := make([]INode, 0)
+	for _, bNode := range n.BootstrapNodes {
+		bNodes = append(bNodes, bNode)
+	}
+	return bNodes
+}
+
+func (n *Node) GetNetworkID() int {
+	return n.NetworkID
+}
+
+
+func (n *Node) GetProtocols() []string {
+	return n.Protocols
+}
+
 func (n *Node) IsOnline() bool {
 	return n.online
 }
@@ -122,29 +155,48 @@ func (n *Node) Kill()  {
 	godes.Interrupt(n)
 }
 
-func (n *Node) GetTableStats() map[float64]int {
-	return n.tab.nodeStat
+func (n *Node) GetDiscoveryTable()  IDiscoverTable  {
+	return n.tab
+}
+func (n *Node) GetUDP() IUdp {
+	return n.udp
+}
+
+func (n *Node) GetTableStats() map[float64][]int {
+	return n.tab.GetTableStats()
+}
+
+func (n *Node) GetServerPeersStats() map[float64][]int  {
+	return n.Server().GetPeerStats()
 }
 
 func (n *Node) setOnline(online bool)  {
 	n.online = online
-	n.tab.SetOnline(online)
+
+	if n.tab != nil {
+		n.tab.SetOnline(online)
+	}
+
+	if n.server != nil {
+		n.server.SetOnline(online)
+	}
+
 	n.log("online:", online)
 
 	nodeCountChanged(online)
 }
 
-func (n *Node) MarkMessageSend(m *Message){
+func (n *Node) MarkMessageSend(m IMessage){
 	n.addMsg(m, n.msgSent)
 }
-func (n *Node) MarkMessageReceived(m *Message){
+func (n *Node) MarkMessageReceived(m IMessage){
 	n.addMsg(m, n.msgReceived)
 }
 
-func (n *Node) addMsg(msg *Message, msgMap map[string][]Msg)  {
-	t := config.MetricConfig.GetTimeGroup()
+func (n *Node) addMsg(msg IMessage, msgMap map[string][]Msg)  {
+	t := MetricConfig.GetTimeGroup()
 	//TODO: msg size
-	msgMap[msg.Type] = append(msgMap[msg.Type], Msg{t, 1})
+	msgMap[msg.GetType()] = append(msgMap[msg.GetType()], Msg{t, 1})
 }
 /*
 func (n *Node) GetMessagesSent(msgType string) int {
@@ -182,16 +234,16 @@ func mapSum(data map[string][]Msg) int {
 }
 
 func (n *Node) startP2P()  {
-	n.tab, n.udp = newUDP(n)
+	n.tab, n.udp = discovery.NewUDP(n)
 	n.log("P2P running")
 }
 
 func (n *Node) startServer()  {
-	n.server = NewServer(n)
+	n.server = devp2p.NewServer(n)
 	n.server.Start()
 }
 
-func (n *Node) Server() *Server {
+func (n *Node) Server() IServer {
 	return n.server
 }
 
@@ -199,12 +251,12 @@ func (n *Node) Server() *Server {
 func (n *Node) doChurn()  {
 
 
-	if !n.churn(false, config.SimConfig.NextNodeSessionTime()){
+	if !n.churn(false, SimConfig.NextNodeSessionTime()){
 		return
 	}
 
 
-	if !n.churn(true, config.SimConfig.NextNodeIntersessionTime()){
+	if !n.churn(true, SimConfig.NextNodeIntersessionTime()){
 		return
 	}
 
@@ -213,7 +265,7 @@ func (n *Node) doChurn()  {
 
 func (n *Node) churn(online bool, time float64) bool {
 
-	untilEnd := config.SimConfig.SimulationTime - godes.GetSystemTime()
+	untilEnd := SimConfig.SimulationTime - godes.GetSystemTime()
 
 	if time + godes.GetSystemTime() > n.lifetime || untilEnd <= time {
 		n.advanceToEnd()
@@ -228,7 +280,7 @@ func (n *Node) churn(online bool, time float64) bool {
 
 func (n *Node) advanceToEnd()  {
 
-	untilEnd := config.SimConfig.SimulationTime - godes.GetSystemTime()
+	untilEnd := SimConfig.SimulationTime - godes.GetSystemTime()
 
 	if !n.isBootstrapNode {
 		// advance do lifetime ili kraj simulacije, ovisi sto je krace
@@ -242,9 +294,9 @@ func (n *Node) advanceToEnd()  {
 
 func (n *Node) waitForEnd()  {
 	// ako jos simulacija ni zavrsila, sto je moguce ako smo dodani nakon zavrsetka simulacije
-	if !config.SimConfig.SimulationEnded() {
+	if !SimConfig.SimulationEnded() {
 
-		if config.SimConfig.ChurnEnabled && !n.isBootstrapNode {
+		if SimConfig.ChurnEnabled && !n.isBootstrapNode {
 			n.doChurn()
 		} else {
 
@@ -277,7 +329,7 @@ func (n *Node) String() string {
 
 func (n *Node) log(a ...interface{})  {
 
-	if config.LogConfig.LogNode {
+	if LogConfig.LogNode {
 		util.Log(n, a)
 	}
 

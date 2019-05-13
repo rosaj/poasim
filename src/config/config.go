@@ -73,22 +73,22 @@ type logConfig struct {
 type metricConfig struct {
 	// jedinica po kojoj se grupiraju poruke
 	// npr. 60 znaci da se poruke grupiraju po minuti
-	MsgGroupFactor float64
+	GroupFactor float64
 
 }
 
 
 var SimConfig = config {
 
-	SimulationTime: (60 * time.Minute).Seconds(),
+	SimulationTime: (1 * 3 * time.Hour).Seconds(),
 
-	NodeCount: 50,
+	NodeCount: 100,
 
 	NodeStabilisationTime:  30 * time.Minute.Seconds(),
 
-	ChurnEnabled: false,
+	ChurnEnabled: true,
 
-	NodeArrivalDistr: NewNormalDistr((10*time.Minute.Seconds())/50, 0),
+	NodeArrivalDistr: NewNormalDistr((80*time.Minute.Seconds())/100, 0),
 
 	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Hour).Seconds())),
 
@@ -118,7 +118,7 @@ var LogConfig = logConfig {
 
 	LogNode: false,
 
-	LogPeer: true,
+	LogPeer: false,
 
 	LogDiscovery: false,
 
@@ -127,7 +127,7 @@ var LogConfig = logConfig {
 
 var MetricConfig  = metricConfig {
 
-	MsgGroupFactor: 60,
+	GroupFactor: 60,
 
 
 }
@@ -198,5 +198,5 @@ func clampToSimTime(config *config, distr distribution) (interval float64)  {
 }
 
 func (metricConfig *metricConfig) GetTimeGroup() float64 {
-	return	math.Round(godes.GetSystemTime()/ metricConfig.MsgGroupFactor)
+	return	math.Round(godes.GetSystemTime()/ metricConfig.GroupFactor)
 }
