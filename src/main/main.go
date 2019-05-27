@@ -3,12 +3,19 @@ package main
 import (
 	"../config"
 	"../network"
+	"../network/eth/common"
+	"../network/eth/core/types"
 	"../network/protocol"
 	"../plot"
 	"../util"
+	"crypto/ecdsa"
 	"fmt"
+
 	"github.com/agoussia/godes"
+	"github.com/ethereum/go-ethereum/crypto"
 	"math"
+	"math/big"
+	"math/rand"
 	"runtime"
 	sysTime "time"
 )
@@ -100,6 +107,35 @@ func logProgress(a ...interface{})  {
 	util.Print(math.Round((godes.GetSystemTime()/config.SimConfig.SimulationTime)*100), "% elapsed:", sysTime.Since(startTime), a)
 }
 
+var (
+	testBankKey, _  = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+	testBankAddress = crypto.PubkeyToAddress(testBankKey.PublicKey)
+	testBankFunds   = big.NewInt(1000000000000000000)
+
+	acc1Key, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
+	acc2Key, _ = crypto.HexToECDSA("49a7b37aa6f6645917e7b807e9d1c00d4fa71f18343b0d4122a4d2df64dd6fee")
+	acc1Addr   = crypto.PubkeyToAddress(acc1Key.PublicKey)
+	acc2Addr   = crypto.PubkeyToAddress(acc2Key.PublicKey)
+
+	testContractCode         = common.Hex2Bytes("606060405260cc8060106000396000f360606040526000357c01000000000000000000000000000000000000000000000000000000009004806360cd2685146041578063c16431b914606b57603f565b005b6055600480803590602001909190505060a9565b6040518082815260200191505060405180910390f35b60886004808035906020019091908035906020019091905050608a565b005b80600060005083606481101560025790900160005b50819055505b5050565b6000600060005082606481101560025790900160005b5054905060c7565b91905056")
+	testContractAddr         common.Address
+	testContractCodeDeployed = testContractCode[16:]
+	testContractDeployed     = uint64(2)
+
+	testEventEmitterCode = common.Hex2Bytes("60606040523415600e57600080fd5b7f57050ab73f6b9ebdd9f76b8d4997793f48cf956e965ee070551b9ca0bb71584e60405160405180910390a160358060476000396000f3006060604052600080fd00a165627a7a723058203f727efcad8b5811f8cb1fc2620ce5e8c63570d697aef968172de296ea3994140029")
+	testEventEmitterAddr common.Address
+
+	testBufLimit = uint64(100)
+)
+
+
+// newTestTransaction create a new dummy transaction.
+func newTestTransaction(from *ecdsa.PrivateKey, nonce uint64, datasize int, gasPrice int64) *types.Transaction {
+	tx := types.NewTransaction(nonce, common.Address{}, big.NewInt(0), 100000, big.NewInt(gasPrice), make([]byte, datasize))
+	tx, _ = types.SignTx(tx, types.HomesteadSigner{}, from)
+	return tx
+}
+
 func runSim(){
 
 	runtime.GOMAXPROCS(1)
@@ -109,6 +145,7 @@ func runSim(){
 
 	nodes := runNodes()
 
+	godes.Advance(config.SimConfig.NodeStabilisationTime)
 
 	/*
 	 for !config.SimConfig.SimulationEnded() {
@@ -124,28 +161,49 @@ func runSim(){
 	 }
 	*/
 
-/*
 
-	godes.Advance(5 * 60)
 
-	interval := 1.0
-	times := 1000
+	//godes.Advance(5 * 60)
+
+	//interval := 0.1
+	times := 300
+	counter := 0
 	for times > 0 {
 		times-=1
-		godes.Advance(interval)
-		interval+=0.1
 
-		txs := make([]*types.Transaction,0)
+		//godes.Advance(interval)
+		//interval+=1
+		key := acc1Key
 
-		tx := types.NewTransaction(uint64(times), common.Address{}, big.NewInt(1000), 10000, big.NewInt(1999), nil)
+		txs := make(types.Transactions,0)
+
+		//tx := types.NewTransaction(uint64(times), common.Address(acc1Addr), big.NewInt(1000), 10000, big.NewInt(1999), nil)
+		tx, _ := types.SignTx(types.NewTransaction(uint64(counter), common.Address(acc1Addr), big.NewInt(1), 1000000, big.NewInt(1), nil), types.HomesteadSigner{}, key)
+		util.Print(counter, fmt.Sprintf("%x", tx.Hash()))
 		txs = append(txs, tx)
-		nodes[rand.Intn(config.SimConfig.NodeCount)].Server().ProtocolManager().BroadcastTxs(txs)
+		util.Print(rand.Intn(config.SimConfig.NodeCount))
+		nodes[rand.Intn(config.SimConfig.NodeCount)].Server().GetProtocolManager().AddTxs(txs)
+		counter += 1
+
 	}
 
 
+
+/*
+	var testAccount, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+
+	const txsyncPackSize = 100 * 1024
+
+	// Fill the pool with big transactions.
+	const txsize = txsyncPackSize / 10
+	alltxs := make([]*types.Transaction, 100)
+	for nonce := range alltxs {
+		alltxs[nonce] = newTestTransaction(testAccount, uint64(nonce), txsize, int64(nonce+1))
+	}
+
+	nodes[rand.Intn(config.SimConfig.NodeCount)].Server().GetProtocolManager().AddTxs(alltxs)
+
 */
-
-
 
 	/*
 
@@ -180,24 +238,11 @@ func runSim(){
 
 */
 
-
-	waitForSimEnd()
-
-	if godes.GetSystemTime() > config.SimConfig.SimulationTime {
-		config.SimConfig.SimulationTime = godes.GetSystemTime()
-	}
-
-	config.LogConfig.Logging = true
-
-	util.Log("Simulation end after:", sysTime.Since(startTime))
-
-	godes.Clear()
-
-	showStats(nodes)
+	waitForEnd(nodes)
 
 }
 
-func waitForSimEnd()  {
+func progressSimToEnd()  {
 	dif := config.SimConfig.SimulationTime - godes.GetSystemTime()
 
 	if dif > 0 {
@@ -215,6 +260,26 @@ func waitForSimEnd()  {
 			}
 		}
 	}
+}
+
+
+
+func waitForEnd(nodes []*network.Node)  {
+
+	progressSimToEnd()
+
+	if godes.GetSystemTime() > config.SimConfig.SimulationTime {
+		config.SimConfig.SimulationTime = godes.GetSystemTime()
+	}
+
+	config.LogConfig.Logging = true
+
+	util.Log("Simulation end after:", sysTime.Since(startTime))
+
+	godes.Clear()
+
+	showStats(nodes)
+
 }
 
 

@@ -1,6 +1,10 @@
 package common
 
-import "crypto/ecdsa"
+import (
+	//TODO: interface za transakcije?
+	"../network/eth/core/types"
+	"crypto/ecdsa"
+)
 
 // ID is a unique identifier for each node.
 type ID [32]byte
@@ -11,7 +15,7 @@ type INode interface {
 	ID() ID
 	PublicKey() *ecdsa.PublicKey
 	IsOnline() bool
-	GetDiscoveryTable() IDiscoverTable
+	GetDiscoveryTable() IDiscoveryTable
 	GetUDP() IUdp
 	Server() IServer
 
@@ -38,7 +42,7 @@ type IUdp interface {
 
 }
 
-type IDiscoverTable interface {
+type IDiscoveryTable interface {
 	Close()
 	Resolve(INode) INode
 	LookupRandom() []INode
@@ -89,8 +93,12 @@ type IProtocol interface {
 }
 
 type IProtocolManager interface {
+	Start()
+	Stop()
 	FindPeer(node INode) IPeer
 	RetrieveHandshakePeer(node INode) IPeer
 	GetSubProtocols() []IProtocol
+
+	AddTxs(txs types.Transactions)
 
 }

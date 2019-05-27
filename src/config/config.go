@@ -68,6 +68,8 @@ type logConfig struct {
 
 	LogServer bool
 
+	LogProtocol bool
+
 }
 
 type metricConfig struct {
@@ -80,15 +82,15 @@ type metricConfig struct {
 
 var SimConfig = config {
 
-	SimulationTime: (1 * 3 * time.Hour).Seconds(),
+	SimulationTime: (1 * 2 * time.Hour).Seconds(),
 
 	NodeCount: 100,
 
-	NodeStabilisationTime:  30 * time.Minute.Seconds(),
+	NodeStabilisationTime:  5 * time.Minute.Seconds(),
 
-	ChurnEnabled: true,
+	ChurnEnabled: false,
 
-	NodeArrivalDistr: NewNormalDistr((80*time.Minute.Seconds())/100, 0),
+	NodeArrivalDistr: NewNormalDistr((80*time.Minute.Seconds())/1000, 0),
 
 	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Hour).Seconds())),
 
@@ -123,6 +125,8 @@ var LogConfig = logConfig {
 	LogDiscovery: false,
 
 	LogServer: false,
+
+	LogProtocol: true,
 }
 
 var MetricConfig  = metricConfig {

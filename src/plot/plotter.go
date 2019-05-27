@@ -3,7 +3,7 @@ package plot
 import (
 	"../config"
 	. "../network"
-	//. "../network/message"
+	. "../network/message"
 	"../util"
 	"encoding/csv"
 	"fmt"
@@ -49,8 +49,8 @@ func calcMeanPoints(nodes []*Node, dataFunc func(n *Node) map[float64][]int, key
 	stats := make(map[float64][]float64)
 
 	for _, node := range nodes {
-		tableStats := dataFunc(node)
-		for k, v := range tableStats {
+		dataStats := dataFunc(node)
+		for k, v := range dataStats {
 			sum := 0
 			for _, intVal := range v {
 				sum += intVal
@@ -173,7 +173,7 @@ func Stats(nodes []*Node)  {
 
 	err = plotutil.AddLines(p,
 //		"Ping", ptss["PING"],
-	//	"Pong", ptss["PONG"],
+//		"Pong", ptss["PONG"],
 //		"FindNode", ptss["FINDNODE"],
 //		"Neighbors", ptss["NEIGHBORS"],
 //		"SEND_ERR", ptss["SEND_ERR"],
@@ -182,11 +182,11 @@ func Stats(nodes []*Node)  {
 //		"FindNode_Received", ptss["FINDNODE_RECEIVED"],
 //		"Neighbors_Received", ptss["NEIGHBORS_RECEIVED"],
 //		"RECIEVE_ERR", ptss["RECIEVE_ERR"],
-//		"TABLE", ptss["TABLE"],
-//		"Nodes", ptss["NODES"],
+		"TABLE", ptss["TABLE"],
+		"Nodes", ptss["NODES"],
 //		DEVP2P_PING, ptss[DEVP2P_PING],
 //		DEVP2P_PONG, ptss[DEVP2P_PONG],
-//		network.TX_MSG, ptss[network.TX_MSG],
+		TX_MSG, ptss[TX_MSG],
 		"Peers", ptss["Peers"],
 //		DEVP2P_HANDSHAKE, ptss[DEVP2P_HANDSHAKE],
 //		STATUS_MSG, ptss[STATUS_MSG],

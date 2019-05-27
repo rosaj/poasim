@@ -64,9 +64,9 @@ type Node struct {
 
 	id ID
 
-	udp   	IUdp
-	tab   	IDiscoverTable
-	server	IServer
+	udp    IUdp
+	tab    IDiscoveryTable
+	server IServer
 
 	msgSent     map[string][]Msg
 	msgReceived map[string][]Msg
@@ -155,7 +155,7 @@ func (n *Node) Kill()  {
 	godes.Interrupt(n)
 }
 
-func (n *Node) GetDiscoveryTable()  IDiscoverTable  {
+func (n *Node) GetDiscoveryTable() IDiscoveryTable {
 	return n.tab
 }
 func (n *Node) GetUDP() IUdp {

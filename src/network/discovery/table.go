@@ -488,8 +488,6 @@ func (tab *Table) doRevalidate() {
 	}
 
 	// Ping the selected node and wait for a ping.
-	//err := tab.net.ping(last)
-
 	sendPingPackage(tab.self(), last, func(m *Message, err error) {
 	//	tab.log("ping respond, ", m)
 		if err == ErrNodeOffline {

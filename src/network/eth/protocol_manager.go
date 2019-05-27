@@ -4,14 +4,16 @@ import (
 	. "../../common"
 	. "../../config"
 	. "../../util"
-//	ethCore "../eth/core"
+	"../eth/common"
+	"../eth/consensus/clique"
+	"../eth/core"
+	"../eth/core/rawdb"
+	"../eth/core/types"
 	. "../message"
 	. "../protocol"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/fetcher"
 	"github.com/ethereum/go-ethereum/event"
@@ -71,15 +73,16 @@ type ProtocolManager struct {
 
 	SubProtocols []IProtocol
 
-	txsCh         chan core.NewTxsEvent
-	txsSub        event.Subscription
 	minedBlockSub *event.TypeMuxSubscription
 
 	whitelist map[uint64]common.Hash
 
 	// channels for fetcher, syncer, txsyncLoop
-	newPeerCh   chan *ethPeer
+	txsyncCh    chan *txsync
+	newPeerCh   chan *peer
 	quitSync    chan struct{}
+
+	txSyncManager *txSyncManager
 
 }
 
@@ -87,20 +90,38 @@ type ProtocolManager struct {
 // NewProtocolManager returns a new Ethereum sub protocol manager. The Ethereum sub protocol manages peers capable
 // with the Ethereum network.
 func NewProtocolManager(srv IServer) *ProtocolManager {
+
+	chainDb := rawdb.NewMemoryDatabase()
+
+	engine := clique.New(params.RinkebyChainConfig.Clique, chainDb)
+
+	chainConfig, _, err := core.SetupGenesisBlockWithOverride(chainDb, nil, nil)
+	if err != nil {
+		Print("Genesis error ", err)
+	}
+
+
+	blockchain, err := core.NewBlockChain(chainDb, nil, chainConfig,  engine, func(block *types.Block) bool {
+		return false
+	})
+	if err != nil {
+		Print("blockchain error ", err)
+	}
+
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
 		srv:	srv,
-	//	txpool: 	 ethCore.NewTxPool(nil, nil),
+		txpool: 	 core.NewTxPool(core.DefaultTxPoolConfig, params.RinkebyChainConfig, blockchain),
+		blockchain:  blockchain,
 		networkID:   srv.Self().GetNetworkID(),
 		peers:       newPeerSet(),
 		handshakePeers: newPeerSet(),
-		newPeerCh:   make(chan *ethPeer),
+		newPeerCh:   make(chan *peer),
 		quitSync:    make(chan struct{}),
 		maxPeers:  	 srv.Self().GetMaxPeers(),
 	}
 
 
-	// Initiate a sub-protocol for every implemented version we can handle
 	manager.SubProtocols = make([]IProtocol, 0)
 
 
@@ -166,21 +187,25 @@ func (pm *ProtocolManager) removePeer(p IPeer) {
 
 }
 
-func (pm *ProtocolManager) Start(maxPeers int) {
-	pm.maxPeers = maxPeers
+func (pm *ProtocolManager) Start() {
 
 	// broadcast transactions
-	pm.txsCh = make(chan core.NewTxsEvent, txChanSize)
-	pm.txsSub = pm.txpool.SubscribeNewTxsEvent(pm.txsCh)
-	go pm.txBroadcastLoop()
+//	pm.txsCh = make(chan core.NewTxsEvent, txChanSize)
+//	pm.txsSub = pm.txpool.SubscribeNewTxsEvent(pm.txsCh)
+
+	//go pm.txBroadcastLoop()
+
+	pm.txpool.SubscribeNewTxsEvent(func(txEvent core.NewTxsEvent) {
+		pm.BroadcastTxs(txEvent.Txs)
+	})
 
 	// broadcast mined blocks
 	//pm.minedBlockSub = pm.eventMux.Subscribe(core.NewMinedBlockEvent{})
-	go pm.minedBroadcastLoop()
+	//go pm.minedBroadcastLoop()
 
 	// start sync handlers
-	//go pm.syncer()
-	//go pm.txsyncLoop()
+	pm.txSyncManager = newTxSyncManager(pm)
+	pm.txSyncManager.syncer()
 }
 
 func (pm *ProtocolManager) FindPeer(node INode) IPeer  {
@@ -200,27 +225,22 @@ func (pm *ProtocolManager) RetrieveHandshakePeer(node INode) IPeer  {
 func (pm *ProtocolManager) Stop() {
 	pm.log("Stopping Ethereum protocol")
 
-	pm.txsSub.Unsubscribe()        // quits txBroadcastLoop
-	pm.minedBlockSub.Unsubscribe() // quits blockBroadcastLoop
+	pm.txSyncManager.stop()
 
-
-	// Quit fetcher, txsyncLoop.
-	close(pm.quitSync)
+//	pm.minedBlockSub.Unsubscribe() // quits blockBroadcastLoop
 
 	// Disconnect existing sessions.
 	// This also closes the gate for any new registrations on the peer set.
 	// sessions which are already established but not added to pm.peers yet
 	// will exit when they try to register.
 	pm.peers.Close()
-
-
 }
 
 
 
 // handle is the callback invoked to manage the life cycle of an eth peer. When
 // this function terminates, the peer is disconnected.
-func (pm *ProtocolManager) handle(p *ethPeer) {
+func (pm *ProtocolManager) handle(p *peer) {
 	// Ignore maxPeers if this is a trusted peer
 	if pm.peers.Len() >= pm.maxPeers /* && !p.Peer.Info().Network.Trusted*/ {
 
@@ -234,7 +254,16 @@ func (pm *ProtocolManager) handle(p *ethPeer) {
 
 	p.Log("Ethereum peer connected")
 
-	p.Handshake(func(err error) {
+	// Execute the Ethereum handshake
+	var (
+		genesis = pm.blockchain.Genesis()
+		head    = pm.blockchain.CurrentHeader()
+		hash    = head.Hash()
+		number  = head.Number.Uint64()
+		td      = pm.blockchain.GetTd(hash, number)
+	)
+
+	p.Handshake(pm.networkID, td, hash, genesis.Hash(), func(err error) {
 		if err != nil {
 			p.Log("Ethereum handshake failed", "err", err)
 			return
@@ -245,13 +274,26 @@ func (pm *ProtocolManager) handle(p *ethPeer) {
 		if err != nil {
 			p.Log("Ethereum peer registration failed", "err", err)
 			p.HandleError(err)
+			return
 		}
+
+		/*
+		// Register the peer in the downloader. If the downloader considers it banned, we disconnect
+		if err := pm.downloader.RegisterPeer(p.id, p.version, p); err != nil {
+			p.HandleError(err)
+			return
+		}
+		*/
+
+		pm.syncTransactions(p)
+		pm.synchroniseNewPeer(p)
+
 	})
 
 }
 
 
-func (pm *ProtocolManager) HandleTxMsg(p *ethPeer, m *Message)  {
+func (pm *ProtocolManager) HandleTxMsg(p *peer, m *Message)  {
 
 	txs := m.Content.(types.Transactions)
 
@@ -269,7 +311,7 @@ func (pm *ProtocolManager) HandleTxMsg(p *ethPeer, m *Message)  {
 
 
 
-func (pm *ProtocolManager) HandleNewBlockMsg(p *ethPeer, m *Message)  {
+func (pm *ProtocolManager) HandleNewBlockMsg(p *peer, m *Message)  {
 	// Retrieve and decode the propagated block
 
 	var request = m.Content.(newBlockData)
@@ -303,7 +345,7 @@ func (pm *ProtocolManager) HandleNewBlockMsg(p *ethPeer, m *Message)  {
 
 
 
-func (pm *ProtocolManager) HandleNewBlockHashesMsg(p *ethPeer, m *Message) {
+func (pm *ProtocolManager) HandleNewBlockHashesMsg(p *peer, m *Message) {
 	var announces  = m.Content.(newBlockHashesData)
 
 	// Mark the hashes as present at the remote node
@@ -369,7 +411,7 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 // BroadcastTxs will propagate a batch of transactions to all peers which are not known to
 // already have the given transaction.
 func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
-	var txset = make(map[*ethPeer]types.Transactions)
+	var txset = make(map[*peer]types.Transactions)
 
 	// Broadcast transactions to a batch of peers not knowing about it
 	for _, tx := range txs {
@@ -380,6 +422,10 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 		pm.log("Broadcast transaction", "hash", tx.Hash(), "recipients", len(peers))
 	}
 	// FIXME include this again: peers = peers[:int(math.Sqrt(float64(len(peers))))]
+	pm.log("Broadcast txs", len(txs))
+
+	Print(pm.self(), "Sending txs", len(txs), "pending", pm.pendingCount())
+
 	for peer, txs := range txset {
 		peer.AsyncSendTransactions(txs)
 	}
@@ -395,28 +441,36 @@ func (pm *ProtocolManager) minedBroadcastLoop() {
 		}
 	}
 }
+func (pm *ProtocolManager) pendingCount() int  {
+	pending:= pm.txpool.Pending()
+	count := 0
+	for _, v := range pending {
+		count += len(v)
+	}
+	return count
+}
 
-func (pm *ProtocolManager) txBroadcastLoop() {
-	for {
-		select {
-		case event := <-pm.txsCh:
-			pm.BroadcastTxs(event.Txs)
+func (pm *ProtocolManager) AddTxs(txs types.Transactions) {
 
-		// Err() channel will be closed when unsubscribing.
-		case <-pm.txsSub.Err():
-			return
-		}
+	Print(pm.self(), "Added txs", len(txs), "pending", pm.pendingCount())
+	errors := pm.txpool.AddRemotes(txs)
+
+	for k, v := range errors {
+		Print(pm.self(), "Err", k, v)
+
 	}
 }
+
+
 
 // NodeInfo represents a short summary of the Ethereum sub-protocol metadata
 // known about the host peer.
 type NodeInfo struct {
-	Network    int              `json:"network"`    // Ethereum network ID (1=Frontier, 2=Morden, Ropsten=3, Rinkeby=4)
-	Difficulty *big.Int            `json:"difficulty"` // Total difficulty of the host's blockchain
-	Genesis    common.Hash         `json:"genesis"`    // SHA3 hash of the host's genesis block
-	Config     *params.ChainConfig `json:"config"`     // Chain configuration for the fork rules
-	Head       common.Hash         `json:"head"`       // SHA3 hash of the host's best owned block
+	Network    int                  // Ethereum network ID (1=Frontier, 2=Morden, Ropsten=3, Rinkeby=4)
+	Difficulty *big.Int             // Total difficulty of the host's blockchain
+	Genesis    common.Hash          // SHA3 hash of the host's genesis block
+	Config     *params.ChainConfig  // Chain configuration for the fork rules
+	Head       common.Hash          // SHA3 hash of the host's best owned block
 }
 
 // NodeInfo retrieves some protocol metadata about the running host node.
@@ -440,7 +494,7 @@ func (pm *ProtocolManager) String() string {
 }
 
 func (pm *ProtocolManager) log(a ...interface{})  {
-	if LogConfig.LogPeer {
+	if LogConfig.LogProtocol {
 		Log(pm, a)
 	}
 }

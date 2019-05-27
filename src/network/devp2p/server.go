@@ -69,8 +69,8 @@ type Server struct {
 
 	running 		bool
 
-	ntab        	IDiscoverTable
-	lastLookup  	float64
+	ntab       IDiscoveryTable
+	lastLookup float64
 
 	peers       	map[ID]*Peer
 	handshakePeers  map[ID]*Peer
@@ -104,11 +104,7 @@ func NewServer(node INode) *Server {
 
 	return srv
 }
-/*
-func (srv *Server) ProtocolManager() *ProtocolManager {
-	return srv.pm
-}
- */
+
 
 // Self returns the local INode's endpoint information.
 func (srv *Server) Self() INode {
@@ -145,6 +141,10 @@ func (srv *Server) Stop() {
 
 	srv.running = false
 
+	if srv.pm != nil {
+		srv.pm.Stop()
+	}
+
 	if srv.quitFunc != nil {
 		srv.quitFunc()
 	}
@@ -175,6 +175,11 @@ func (srv *Server) Start() {
 
 	srv.log("DynPeers:", dynPeers)
 	srv.run(dialer)
+
+	if srv.pm != nil {
+		srv.pm.Start()
+	}
+
 }
 
 

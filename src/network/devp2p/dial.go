@@ -15,14 +15,14 @@ import (
 
 const (
 	// This is the amount of time spent waiting in between
-	// redialing a certain INode.
+	// redialing a certain Node.
 	dialHistoryExpiration = 30 * time.Second
 
 	// Discovery lookups are throttled and can only run
 	// once every few seconds.
 	lookupInterval = 4 * time.Second
 
-	// If no peers are found for this amount of time, the initial bootINodes are
+	// If no peers are found for this amount of time, the initial bootNodes are
 	// attempted to be connected.
 	fallbackInterval = 20 * time.Second
 
@@ -34,19 +34,19 @@ const (
 
 type dialstate struct {
 	maxDynDials int
-	ntab        IDiscoverTable
+	ntab        IDiscoveryTable
 
 	self        ID
 
 	lookupRunning bool
 	dialing       map[ID]connFlag
 	lookupBuf     []INode // current discovery lookup results
-	randomINodes   []INode // filled from Table
+	randomNodes   []INode // filled from Table
 	static        map[ID]*dialTask
 	hist          *dialHistory
 
 	start     float64     // time when the dialer was first used
-	bootINodes []INode // default dials when there are no peers
+	bootNodes []INode // default dials when there are no peers
 
 	runningTasks map[*task]*taskRunner
 }
@@ -119,19 +119,19 @@ type waitExpireTask struct {
 	float64
 }
 
-func newDialState(self ID, static []INode, bootINodes []INode, ntab IDiscoverTable, maxdyn int) *dialstate {
+func newDialState(self ID, static []INode, bootNodes []INode, ntab IDiscoveryTable, maxdyn int) *dialstate {
 	s := &dialstate{
 		maxDynDials: maxdyn,
 		ntab:        ntab,
 		self:        self,
 		static:      make(map[ID]*dialTask),
 		dialing:     make(map[ID]connFlag),
-		bootINodes:   make([]INode, len(bootINodes)),
-		randomINodes: make([]INode, maxdyn/2),
+		bootNodes:   make([]INode, len(bootNodes)),
+		randomNodes: make([]INode, maxdyn/2),
 		hist:        new(dialHistory),
 		runningTasks:make(map[*task]*taskRunner),
 	}
-	copy(s.bootINodes, bootINodes)
+	copy(s.bootNodes, bootNodes)
 	for _, n := range static {
 		s.addStatic(n)
 	}
@@ -209,17 +209,17 @@ func (s *dialstate) newTasks(nRunning int, peers map[ID]*Peer, now float64) []ta
 
 
 
-	// If we don't have any peers whatsoever, try to dial a random bootINode. This
+	// If we don't have any peers whatsoever, try to dial a random bootNode. This
 	// scenario is useful for the testnet (and private networks) where the discovery
 	// table might be full of mostly bad peers, making it hard to find good ones.
-	if len(peers) == 0 && len(s.bootINodes) > 0 && needDynDials > 0 && godes.GetSystemTime() - s.start > fallbackInterval.Seconds() {
+	if len(peers) == 0 && len(s.bootNodes) > 0 && needDynDials > 0 && godes.GetSystemTime() - s.start > fallbackInterval.Seconds() {
 
-		bootINode := s.bootINodes[0]
+		bootNode := s.bootNodes[0]
 
-		s.bootINodes = append(s.bootINodes[:0], s.bootINodes[1:]...)
-		s.bootINodes = append(s.bootINodes, bootINode)
+		s.bootNodes = append(s.bootNodes[:0], s.bootNodes[1:]...)
+		s.bootNodes = append(s.bootNodes, bootNode)
 
-		if addDial(dynDialedConn, bootINode) {
+		if addDial(dynDialedConn, bootNode) {
 			needDynDials--
 		}
 
@@ -231,9 +231,9 @@ func (s *dialstate) newTasks(nRunning int, peers map[ID]*Peer, now float64) []ta
 	randomCandidates := needDynDials / 2
 
 	if randomCandidates > 0 {
-		n := s.ntab.ReadRandomNodes(s.randomINodes)
+		n := s.ntab.ReadRandomNodes(s.randomNodes)
 		for i := 0; i < randomCandidates && i < n; i++ {
-			if addDial(dynDialedConn, s.randomINodes[i]) {
+			if addDial(dynDialedConn, s.randomNodes[i]) {
 				needDynDials--
 			}
 		}

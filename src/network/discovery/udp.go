@@ -190,11 +190,11 @@ func (req *findnode) preverify(t *UDP, from INode) bool {
 	}
 
 	if godes.GetSystemTime() - t.db.LastPongReceived(from) > bondExpiration.Seconds() {
-		// No endpoint proof sendPongPackage exists, we don't process the packet. This prevents an
+		// No endpoint proof pong packet exists, we don't process the packet. This prevents an
 		// attack vector where the discovery protocol could be used to amplify traffic in a
 		// DDOS attack. A malicious actor would send a findnode request with the IP address
 		// and UDP port of the target as the source address. The recipient of the findnode
-		// packet would then send a sendNeighborsPackage packet (which is a much bigger packet than
+		// packet would then send a neighbours packet (which is a much bigger packet than
 		// findnode) to the victim.
 		util.Log("unknown node:", from.Name())
 		return false
