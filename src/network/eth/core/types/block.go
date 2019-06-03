@@ -20,16 +20,14 @@ package types
 import (
 	"../../../eth/common"
 	"encoding/binary"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/rlp"
+	"golang.org/x/crypto/sha3"
 	"io"
 	"math/big"
 	"reflect"
 	"sort"
 	"sync/atomic"
-	"time"
-
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/rlp"
-	"golang.org/x/crypto/sha3"
 )
 
 var (
@@ -140,7 +138,7 @@ type Block struct {
 
 	// These fields are used by package eth to track
 	// inter-peer block relay.
-	ReceivedAt   time.Time
+	ReceivedAt   uint64
 	ReceivedFrom interface{}
 }
 

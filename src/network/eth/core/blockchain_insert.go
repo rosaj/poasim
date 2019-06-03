@@ -17,12 +17,12 @@
 package core
 
 import (
+	. "../../../config"
+	. "../../../util"
 	"../../eth/core/types"
 	"../common"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/mclock"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 // insertStats tracks and reports on block insertion.
@@ -30,7 +30,7 @@ type insertStats struct {
 	queued, processed, ignored int
 	usedGas                    uint64
 	lastIndex                  int
-	startTime                  mclock.AbsTime
+	startTime                  uint64
 }
 
 // statsReportLimit is the time limit during import and export after which we
@@ -42,8 +42,8 @@ const statsReportLimit = 8 * time.Second
 func (st *insertStats) report(chain []*types.Block, index int, dirty common.StorageSize) {
 	// Fetch the timings for the batch
 	var (
-		now     = mclock.Now()
-		elapsed = time.Duration(now) - time.Duration(st.startTime)
+		now     = SecondsNow()
+		elapsed = ToDuration(float64(now)) - ToDuration(float64(st.startTime))
 	)
 	// If we're at the last block of the batch or report period reached, log
 	if index == len(chain)-1 || elapsed >= statsReportLimit {
@@ -71,7 +71,7 @@ func (st *insertStats) report(chain []*types.Block, index int, dirty common.Stor
 		if st.ignored > 0 {
 			context = append(context, []interface{}{"ignored", st.ignored}...)
 		}
-		log.Info("Imported new chain segment", context...)
+	//	log.Info("Imported new chain segment", context...)
 
 		// Bump the stats reported to the next section
 		*st = insertStats{startTime: now, lastIndex: index + 1}
@@ -163,4 +163,9 @@ func (it *insertIterator) remaining() int {
 // processed returns the number of processed blocks.
 func (it *insertIterator) processed() int {
 	return it.index + 1
+}
+func (bc *insertIterator) log(a ...interface{})  {
+	if LogConfig.LogBlockchain {
+		Print("Blockchain inserter", a)
+	}
 }

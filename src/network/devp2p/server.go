@@ -3,7 +3,6 @@ package devp2p
 import (
 	. "../../common"
 	. "../../config"
-	"../../network/eth"
 	. "../../util"
 
 	"errors"
@@ -79,8 +78,6 @@ type Server struct {
 	refreshFunc 	func()
 	quitFunc		func()
 
-	pm				IProtocolManager
-
 	peerStats		map[float64][]int
 }
 
@@ -91,16 +88,13 @@ func NewServer(node INode) *Server {
 				peers: make(map[ID]*Peer),
 				handshakePeers: make(map[ID]*Peer),
 				peerStats: make(map[float64][]int),
+
 				Config : Config {
 					MaxPeers: node.GetMaxPeers(),
 					DialRatio: node.GetDialRatio(),
 					BootstrapINodes: node.GetBootstrapNodes(),
 				},
 			}
-
-
-	srv.pm = eth.NewProtocolManager(srv)
-	srv.Protocols = srv.pm.GetSubProtocols()
 
 	return srv
 }
@@ -116,10 +110,11 @@ func (srv *Server) GetProtocols() []IProtocol {
 	return srv.Protocols
 }
 
+/*
 func (srv *Server) GetProtocolManager() IProtocolManager {
 	return srv.pm
 }
-
+*/
 func (srv *Server) SetOnline(online bool)  {
 
 	if online {
@@ -140,10 +135,6 @@ func (srv *Server) Stop() {
 	srv.log("Stopping...")
 
 	srv.running = false
-
-	if srv.pm != nil {
-		srv.pm.Stop()
-	}
 
 	if srv.quitFunc != nil {
 		srv.quitFunc()
@@ -175,10 +166,6 @@ func (srv *Server) Start() {
 
 	srv.log("DynPeers:", dynPeers)
 	srv.run(dialer)
-
-	if srv.pm != nil {
-		srv.pm.Start()
-	}
 
 }
 

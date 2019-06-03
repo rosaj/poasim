@@ -68,8 +68,19 @@ type logConfig struct {
 
 	LogServer bool
 
+	LogEthServer bool
+
+	LogWorker bool
+
+	LogConsensus bool
+
 	LogProtocol bool
 
+	LogBlockchain bool
+
+	LogTxPool bool
+
+	LogDownload bool
 }
 
 type metricConfig struct {
@@ -82,15 +93,15 @@ type metricConfig struct {
 
 var SimConfig = config {
 
-	SimulationTime: (1 * 2 * time.Hour).Seconds(),
+	SimulationTime: (1 * 30 * time.Minute).Seconds(),
 
-	NodeCount: 100,
+	NodeCount: 6,
 
 	NodeStabilisationTime:  5 * time.Minute.Seconds(),
 
 	ChurnEnabled: false,
 
-	NodeArrivalDistr: NewNormalDistr((80*time.Minute.Seconds())/1000, 0),
+	NodeArrivalDistr: NewNormalDistr((5*time.Second.Seconds()), 0),
 
 	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Hour).Seconds())),
 
@@ -112,7 +123,7 @@ var SimConfig = config {
 
 var LogConfig = logConfig {
 
-	Logging: false,
+	Logging: true,
 
 	LogMessages: false,
 
@@ -126,7 +137,19 @@ var LogConfig = logConfig {
 
 	LogServer: false,
 
-	LogProtocol: true,
+	LogEthServer: false,
+
+	LogWorker: false,
+
+	LogConsensus: true,
+
+	LogProtocol: false,
+
+	LogBlockchain: false,
+
+	LogTxPool: false,
+
+	LogDownload: false,
 }
 
 var MetricConfig  = metricConfig {

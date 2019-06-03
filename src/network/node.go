@@ -3,11 +3,13 @@ package network
 import (
 	. "../common"
 	. "../config"
-	"../network/devp2p"
 	"../network/discovery"
+	"../network/eth"
+	"../network/eth/common"
 	"../util"
 	"crypto/ecdsa"
 	"github.com/agoussia/godes"
+	"github.com/ethereum/go-ethereum/crypto"
 	"math"
 	"strconv"
 )
@@ -60,7 +62,9 @@ type Node struct {
 	lifetime        float64
 	isBootstrapNode bool
 
+	privateKey *ecdsa.PrivateKey
 	publicKey *ecdsa.PublicKey
+	address 		common.Address
 
 	id ID
 
@@ -72,6 +76,7 @@ type Node struct {
 	msgReceived map[string][]Msg
 
 }
+
 
 type Msg struct {
 	Time float64
@@ -98,8 +103,13 @@ func NewNode(nodeConfig *NodeConfig) (n* Node) {
 	n.lifetime = SimConfig.NextNodeLifetime()
 	n.isBootstrapNode = false
 
-	n.publicKey = &NewKey().PublicKey
+	n.privateKey = NewKey()
+	n.publicKey = &n.privateKey.PublicKey
 	copy(n.id[:], PublicKeyToId(n.publicKey))
+
+	address := crypto.PubkeyToAddress(*n.PublicKey())
+	n.address = common.Address(address)
+
 
 	n.msgReceived = make(map[string][]Msg)
 	n.msgSent = make(map[string][]Msg)
@@ -114,13 +124,26 @@ func NewNode(nodeConfig *NodeConfig) (n* Node) {
 func (n *Node) Name() string {
 	return n.name
 }
+
+func (n *Node) PrivateKey() *ecdsa.PrivateKey{
+	return n.privateKey
+}
+
 func (n *Node) PublicKey() *ecdsa.PublicKey{
 	return n.publicKey
 }
 
+
+
 func (n *Node) ID() ID {
 	return n.id
 }
+
+
+func (n *Node) Address() common.Address {
+	return n.address
+}
+
 
 func (n *Node) GetMaxPeers() int {
 	return n.MaxPeers
@@ -239,8 +262,14 @@ func (n *Node) startP2P()  {
 }
 
 func (n *Node) startServer()  {
-	n.server = devp2p.NewServer(n)
+	var err error
+	n.server, err = eth.New(n, nil) //devp2p.NewServer(n)
+	if err != nil {
+		n.log(err)
+		return
+	}
 	n.server.Start()
+	n.log("Started server")
 }
 
 func (n *Node) Server() IServer {

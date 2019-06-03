@@ -70,7 +70,6 @@ type peer struct {
 	pm *ProtocolManager
 
 	version  int         // Protocol version negotiated
-	syncDrop *time.Timer // Timed connection dropper if sync progress isn't validated in time
 
 	head common.Hash
 	td   *big.Int
@@ -186,6 +185,7 @@ func (p *peer) NewMsg(to INode, msgType string, content interface{}, responseTo 
 		}, 0)
 
 }
+
 
 func (p *peer) send(msgType string, content interface{}, handler func(m *Message), listener func(err error))  {
 
@@ -310,12 +310,69 @@ func (p *peer) AsyncSendNewBlock(block *types.Block, td *big.Int) {
 }
 
 
+// SendBlockHeaders sends a batch of block headers to the remote peer.
+func (p *peer) SendBlockHeaders(headers []*types.Header, listener func(err error)) {
+
+	p.send(BLOCK_HEADERS_MSG, headers, func(m *Message) {
+		otherPeer := p.nodesEthPeer()
+		otherPeer.pm.HandleBlockHeadersMsg(otherPeer, m)
+	}, listener)
+}
+
+
+
+// RequestHeadersByHash fetches a batch of blocks' headers corresponding to the
+// specified header query, based on the hash of an origin block.
+func (p *peer) RequestHeadersByHash(origin common.Hash, amount int, skip int, reverse bool) {
+	p.Log("Fetching batch of headers", "count", amount, "fromhash", origin, "skip", skip, "reverse", reverse)
+	data := &getBlockHeadersData{Origin: hashOrNumber{Hash: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse}
+
+	p.send(GET_BLOCK_HEADERS_MSG, data, func(m *Message) {
+		otherPeer := p.nodesEthPeer()
+		otherPeer.pm.HandleGetBlockHeadersMsg(otherPeer, m)
+	}, nil)
+
+}
+
+func (p *peer) GetHeadersByHash(origin common.Hash, amount int, skip int, reverse bool) ([]*types.Header, error) {
+	data := &getBlockHeadersData{Origin: hashOrNumber{Hash: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse}
+
+	otherPeer := p.nodesEthPeer()
+	if otherPeer != nil {
+		return otherPeer.pm.getBlockHeaders(data), nil
+	}
+
+	return nil, errEthPeerClosed
+}
+func (p *peer) GetHeadersByNumber(origin uint64, amount int, skip int, reverse bool) ([]*types.Header, error)  {
+	p.Log("Fetching batch of headers", "count", amount, "fromnum", origin, "skip", skip, "reverse", reverse)
+	data := &getBlockHeadersData{Origin: hashOrNumber{Number: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse}
+
+	otherPeer := p.nodesEthPeer()
+	if otherPeer != nil {
+		return otherPeer.pm.getBlockHeaders(data), nil
+	}
+
+	return nil, errEthPeerClosed
+}
+
+
+// RequestBodies fetches a batch of blocks' bodies corresponding to the hashes
+// specified.
+func (p *peer) GetBodies(hashes []common.Hash) (map[common.Hash]*types.Body, error) {
+	p.Log("Getting batch of block bodies", "count", len(hashes))
+
+	otherPeer := p.nodesEthPeer()
+	if otherPeer != nil {
+		return otherPeer.pm.getBlockBodies(hashes), nil
+	}
+
+	return nil, errEthPeerClosed
+
+}
+
 
 /*
-// SendBlockHeaders sends a batch of block headers to the remote peer.
-func (p *peer) SendBlockHeaders(headers []*types.Header) error {
-	return p2p.Send(p.rw, BlockHeadersMsg, headers)
-}
 
 // SendBlockBodies sends a batch of block contents to the remote peer.
 func (p *peer) SendBlockBodies(bodies []*blockBody) error {
@@ -347,12 +404,6 @@ func (p *peer) RequestOneHeader(hash common.Hash) error {
 	return p2p.Send(p.rw, GetBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Hash: hash}, Amount: uint64(1), Skip: uint64(0), Reverse: false})
 }
 
-// RequestHeadersByHash fetches a batch of blocks' headers corresponding to the
-// specified header query, based on the hash of an origin block.
-func (p *peer) RequestHeadersByHash(origin common.Hash, amount int, skip int, reverse bool) error {
-	p.Log("Fetching batch of headers", "count", amount, "fromhash", origin, "skip", skip, "reverse", reverse)
-	return p2p.Send(p.rw, GetBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Hash: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
-}
 
 // RequestHeadersByNumber fetches a batch of blocks' headers corresponding to the
 // specified header query, based on the number of an origin block.
@@ -445,7 +496,9 @@ func (p *peer) Handshake(network int, td *big.Int, head common.Hash, genesis com
 				var status *statusData
 				status, err = peer.readStatus(peer.pm.networkID, peer.pm.blockchain.Genesis().Hash(), msg)
 
-				peer.td, peer.head = status.TD, status.CurrentBlock
+				if status != nil {
+					peer.td, peer.head = status.TD, status.CurrentBlock
+				}
 
 				p.HandleError(err)
 			}
@@ -538,7 +591,7 @@ func (ps *peerSet) Delete(id ID)  {
 }
 
 // Peer retrieves the registered peer with the given id.
-func (ps *peerSet) Peer(id ID) *peer {
+func (ps *peerSet) Peer(id ID) IPeer {
 	return ps.peers[id]
 }
 

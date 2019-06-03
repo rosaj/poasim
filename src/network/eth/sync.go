@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/eth/downloader"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 const (
@@ -162,11 +161,14 @@ func (pm *ProtocolManager) synchronise(peer *peer) {
 	if peer == nil {
 		return
 	}
+
+	pm.log("synchronise with peer", peer)
+
 	// Make sure the peer's TD is higher than our own
 	currentBlock := pm.blockchain.CurrentBlock()
 	td := pm.blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64())
 
-	_, pTd := peer.Head() //pHead
+	pHead, pTd := peer.Head()
 	if pTd.Cmp(td) <= 0 {
 		return
 	}
@@ -191,15 +193,14 @@ func (pm *ProtocolManager) synchronise(peer *peer) {
 		}
 	}
 
-	//TODO: uncomment this
-/*
+
 	// Run the sync cycle, and disable fast sync if we've went past the pivot block
-	if err := pm.downloader.Synchronise(peer.id, pHead, pTd, mode); err != nil {
+	if err := pm.downloader.Synchronise(peer.id, pHead, pTd); err != nil {
 		return
 	}
-*/
+
 	if atomic.LoadUint32(&pm.fastSync) == 1 {
-		log.Info("Fast sync complete, auto disabling")
+		pm.log("Fast sync complete, auto disabling")
 		atomic.StoreUint32(&pm.fastSync, 0)
 	}
 	atomic.StoreUint32(&pm.acceptTxs, 1) // Mark initial sync done
@@ -213,3 +214,4 @@ func (pm *ProtocolManager) synchronise(peer *peer) {
 		pm.BroadcastBlock(head, false)
 	}
 }
+

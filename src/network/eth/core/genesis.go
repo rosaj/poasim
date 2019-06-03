@@ -17,6 +17,7 @@
 package core
 
 import (
+	. "../../../common"
 	"../common"
 	"../core/rawdb"
 	"../core/state"
@@ -151,9 +152,9 @@ func (e *GenesisMismatchError) Error() string {
 //
 // The returned chain configuration is never nil.
 func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig, common.Hash, error) {
-	return SetupGenesisBlockWithOverride(db, genesis, nil)
+	return SetupGenesisBlockWithOverride(db, genesis)
 }
-func SetupGenesisBlockWithOverride(db ethdb.Database, genesis *Genesis, constantinopleOverride *big.Int) (*params.ChainConfig, common.Hash, error) {
+func SetupGenesisBlockWithOverride(db ethdb.Database, genesis *Genesis) (*params.ChainConfig, common.Hash, error) {
 	if genesis != nil && genesis.Config == nil {
 		return params.AllEthashProtocolChanges, common.Hash{}, errGenesisNoConfig
 	}
@@ -180,10 +181,7 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, genesis *Genesis, constant
 
 	// Get the existing chain configuration.
 	newcfg := genesis.configOrDefault(stored)
-	if constantinopleOverride != nil {
-		newcfg.ConstantinopleBlock = constantinopleOverride
-		newcfg.PetersburgBlock = constantinopleOverride
-	}
+
 	storedcfg := rawdb.ReadChainConfig(db, stored)
 	if storedcfg == nil {
 		log.Warn("Found genesis block without chain config")
@@ -231,6 +229,8 @@ func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 	return params.RinkebyChainConfig
 }
 
+var Sealers []INode
+
 // ToBlock creates the genesis block and writes state of a genesis specification
 // to the given database (or discards it if nil).
 func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
@@ -246,6 +246,24 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 			statedb.SetState(addr, key, value)
 		}
 	}
+
+	extraVanity := 32
+	extraSeal := 65
+
+	g.ExtraData =  make([]byte, 0)
+
+	g.ExtraData = append(g.ExtraData, bytes.Repeat([]byte{0x00}, extraVanity)...)
+
+	g.ExtraData = g.ExtraData[:extraVanity]
+
+
+	for _, signer := range Sealers {
+		ad := signer.Address()
+		g.ExtraData = append(g.ExtraData, ad[:]...)
+	}
+
+	g.ExtraData = append(g.ExtraData, make([]byte, extraSeal)...)
+
 
 	root := statedb.IntermediateRoot(false)
 	head := &types.Header{
@@ -316,7 +334,7 @@ func GenesisBlockForTesting(db ethdb.Database, addr common.Address, balance *big
 func DefaultRinkebyGenesisBlock() *Genesis {
 	return &Genesis{
 		Config:     params.RinkebyChainConfig,
-		Timestamp:  1492009146,
+		Timestamp:  0,
 		ExtraData:  hexutil.MustDecode("0x52657370656374206d7920617574686f7269746168207e452e436172746d616e42eb768f2244c8811c63729a21a3569731535f067ffc57839b00206d1ad20c69a1981b489f772031b279182d99e65703f0076e4812653aab85fca0f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
 		GasLimit:   4700000,
 		Difficulty: big.NewInt(1),

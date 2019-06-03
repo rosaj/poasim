@@ -18,6 +18,7 @@
 package state
 
 import (
+	. "../../../../util"
 	"../../common"
 	"../../trie"
 	"../types"
@@ -416,7 +417,7 @@ func (self *StateDB) Suicide(addr common.Address) bool {
 func (s *StateDB) updateStateObject(stateObject *stateObject) {
 	// Track the amount of time wasted on updating the account from the trie
 	if metrics.EnabledExpensive {
-		defer func(start time.Time) { s.AccountUpdates += time.Since(start) }(time.Now())
+		defer func(start uint64) { s.AccountUpdates += TimeSince(start) }(SecondsNow())
 	}
 	// Encode the account and update the account trie
 	addr := stateObject.Address()
@@ -432,7 +433,7 @@ func (s *StateDB) updateStateObject(stateObject *stateObject) {
 func (s *StateDB) deleteStateObject(stateObject *stateObject) {
 	// Track the amount of time wasted on deleting the account from the trie
 	if metrics.EnabledExpensive {
-		defer func(start time.Time) { s.AccountUpdates += time.Since(start) }(time.Now())
+		defer func(start uint64) { s.AccountUpdates += TimeSince(start) }(SecondsNow())
 	}
 	// Delete the account from the trie
 	stateObject.deleted = true
@@ -452,7 +453,7 @@ func (s *StateDB) getStateObject(addr common.Address) (stateObject *stateObject)
 	}
 	// Track the amount of time wasted on loading the object from the database
 	if metrics.EnabledExpensive {
-		defer func(start time.Time) { s.AccountReads += time.Since(start) }(time.Now())
+		defer func(start uint64) { s.AccountReads += TimeSince(start) }(SecondsNow())
 	}
 	// Load the object from the database
 	enc, err := s.trie.TryGet(addr[:])
@@ -658,7 +659,7 @@ func (s *StateDB) IntermediateRoot(deleteEmptyObjects bool) common.Hash {
 
 	// Track the amount of time wasted on hashing the account trie
 	if metrics.EnabledExpensive {
-		defer func(start time.Time) { s.AccountHashes += time.Since(start) }(time.Now())
+		defer func(start uint64) { s.AccountHashes += TimeSince(start) }(SecondsNow())
 	}
 	return s.trie.Hash()
 }
@@ -709,7 +710,7 @@ func (s *StateDB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) 
 	}
 	// Write the account trie changes, measuing the amount of wasted time
 	if metrics.EnabledExpensive {
-		defer func(start time.Time) { s.AccountCommits += time.Since(start) }(time.Now())
+		defer func(start uint64) { s.AccountCommits += TimeSince(start) }(SecondsNow())
 	}
 	root, err = s.trie.Commit(func(leaf []byte, parent common.Hash) error {
 		var account Account

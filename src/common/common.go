@@ -2,6 +2,7 @@ package common
 
 import (
 	//TODO: interface za transakcije?
+	"../network/eth/common"
 	"../network/eth/core/types"
 	"crypto/ecdsa"
 )
@@ -14,6 +15,8 @@ type INode interface {
 	Name() string
 	ID() ID
 	PublicKey() *ecdsa.PublicKey
+	PrivateKey() *ecdsa.PrivateKey
+	Address() common.Address
 	IsOnline() bool
 	GetDiscoveryTable() IDiscoveryTable
 	GetUDP() IUdp
@@ -54,6 +57,7 @@ type IDiscoveryTable interface {
 
 type IServer interface {
 	Start()
+	Stop()
 	RetrieveHandshakePeer(node INode) IPeer
 	FindPeer(node INode) IPeer
 	GetProtocols() []IProtocol

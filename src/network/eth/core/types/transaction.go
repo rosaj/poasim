@@ -20,6 +20,7 @@ import (
 	"../../../eth/common"
 	"container/heap"
 	"errors"
+	"fmt"
 	"io"
 	"math/big"
 	"sync/atomic"
@@ -330,6 +331,10 @@ type TransactionsByPriceAndNonce struct {
 	txs    map[common.Address]Transactions // Per account nonce-sorted list of transactions
 	heads  TxByPrice                       // Next transaction for each unique account (price heap)
 	signer Signer                          // Signer for the set of transactions
+}
+
+func (t *TransactionsByPriceAndNonce) String() string {
+	return fmt.Sprintf("TransactionsByPriceAndNonce: %d", len(t.txs))
 }
 
 // NewTransactionsByPriceAndNonce creates a transaction set that can retrieve

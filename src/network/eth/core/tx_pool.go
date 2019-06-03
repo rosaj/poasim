@@ -17,6 +17,7 @@
 package core
 
 import (
+	. "../../../config"
 	. "../../../util"
 	"../../eth/common"
 	"../../eth/common/prque"
@@ -204,6 +205,7 @@ func (config *TxPoolConfig) log(a ...interface{})  {
 // two states over time as they are received and processed.
 type TxPool struct {
 	*godes.Runner
+	name		 string
 
 	config       TxPoolConfig
 	chainconfig  *params.ChainConfig
@@ -230,13 +232,14 @@ type TxPool struct {
 
 // NewTxPool creates a new transaction pool to gather, sort and filter inbound
 // transactions from the network.
-func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain blockChain) *TxPool {
+func NewTxPool(name string, config TxPoolConfig, chainconfig *params.ChainConfig, chain blockChain) *TxPool {
 	// Sanitize the input to ensure no vulnerable gas prices are set
 	config = (&config).sanitize()
 
 	// Create the transaction pool with its initial settings
 	pool := &TxPool{
 		Runner:		 &godes.Runner{},
+		name: 		 name,
 		config:      config,
 		chainconfig: chainconfig,
 		chain:       chain,
@@ -1087,11 +1090,13 @@ func (pool *TxPool) demoteUnexecutables() {
 
 func (pool *TxPool) String() string {
 	//TODO: pool name
-	return "TxPool"
+	return fmt.Sprintf("TxPool %s", pool.name)
 }
 
 func (pool *TxPool) log(a ...interface{})  {
-	Log(pool, a)
+	if LogConfig.LogTxPool {
+		Log(pool, a)
+	}
 }
 
 

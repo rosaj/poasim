@@ -17,6 +17,7 @@
 package trie
 
 import (
+	. "../../../util"
 	"../../eth/common"
 	"../ethdb"
 	"encoding/binary"
@@ -525,18 +526,18 @@ func (db *Database) Dereference(root common.Hash) {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	nodes, storage, start := len(db.dirties), db.dirtiesSize, time.Now()
+	nodes, storage, start := len(db.dirties), db.dirtiesSize, SecondsNow()
 	db.dereference(root, common.Hash{})
 
 	db.gcnodes += uint64(nodes - len(db.dirties))
 	db.gcsize += storage - db.dirtiesSize
-	db.gctime += time.Since(start)
+	db.gctime += TimeSince(start)
 
-	memcacheGCTimeTimer.Update(time.Since(start))
+	memcacheGCTimeTimer.Update(TimeSince(start))
 	memcacheGCSizeMeter.Mark(int64(storage - db.dirtiesSize))
 	memcacheGCNodesMeter.Mark(int64(nodes - len(db.dirties)))
 
-	log.Debug("Dereferenced trie from memory database", "nodes", nodes-len(db.dirties), "size", storage-db.dirtiesSize, "time", time.Since(start),
+	log.Debug("Dereferenced trie from memory database", "nodes", nodes-len(db.dirties), "size", storage-db.dirtiesSize, "time", TimeSince(start),
 		"gcnodes", db.gcnodes, "gcsize", db.gcsize, "gctime", db.gctime, "livenodes", len(db.dirties), "livesize", db.dirtiesSize)
 }
 
@@ -600,7 +601,7 @@ func (db *Database) Cap(limit common.StorageSize) error {
 	// outside code doesn't see an inconsistent state (referenced data removed from
 	// memory cache during commit but not yet in persistent storage). This is ensured
 	// by only uncaching existing data when the database write finalizes.
-	nodes, storage, start := len(db.dirties), db.dirtiesSize, time.Now()
+	nodes, storage, start := len(db.dirties), db.dirtiesSize, SecondsNow()
 	batch := db.diskdb.NewBatch()
 
 	// db.dirtiesSize only contains the useful data in the cache, but when reporting
@@ -679,13 +680,13 @@ func (db *Database) Cap(limit common.StorageSize) error {
 	}
 	db.flushnodes += uint64(nodes - len(db.dirties))
 	db.flushsize += storage - db.dirtiesSize
-	db.flushtime += time.Since(start)
+	db.flushtime += TimeSince(start)
 
-	memcacheFlushTimeTimer.Update(time.Since(start))
+	memcacheFlushTimeTimer.Update(TimeSince(start))
 	memcacheFlushSizeMeter.Mark(int64(storage - db.dirtiesSize))
 	memcacheFlushNodesMeter.Mark(int64(nodes - len(db.dirties)))
 
-	log.Debug("Persisted nodes from memory database", "nodes", nodes-len(db.dirties), "size", storage-db.dirtiesSize, "time", time.Since(start),
+	log.Debug("Persisted nodes from memory database", "nodes", nodes-len(db.dirties), "size", storage-db.dirtiesSize, "time", TimeSince(start),
 		"flushnodes", db.flushnodes, "flushsize", db.flushsize, "flushtime", db.flushtime, "livenodes", len(db.dirties), "livesize", db.dirtiesSize)
 
 	return nil
@@ -702,7 +703,7 @@ func (db *Database) Commit(node common.Hash, report bool) error {
 	// outside code doesn't see an inconsistent state (referenced data removed from
 	// memory cache during commit but not yet in persistent storage). This is ensured
 	// by only uncaching existing data when the database write finalizes.
-	start := time.Now()
+	start := SecondsNow()
 	batch := db.diskdb.NewBatch()
 
 	// Move all of the accumulated preimages into a write batch
@@ -750,7 +751,7 @@ func (db *Database) Commit(node common.Hash, report bool) error {
 	db.preimages = make(map[common.Hash][]byte)
 	db.preimagesSize = 0
 
-	memcacheCommitTimeTimer.Update(time.Since(start))
+	memcacheCommitTimeTimer.Update(TimeSince(start))
 	memcacheCommitSizeMeter.Mark(int64(storage - db.dirtiesSize))
 	memcacheCommitNodesMeter.Mark(int64(nodes - len(db.dirties)))
 
@@ -758,7 +759,7 @@ func (db *Database) Commit(node common.Hash, report bool) error {
 	if !report {
 		logger = log.Debug
 	}
-	logger("Persisted trie from memory database", "nodes", nodes-len(db.dirties)+int(db.flushnodes), "size", storage-db.dirtiesSize+db.flushsize, "time", time.Since(start)+db.flushtime,
+	logger("Persisted trie from memory database", "nodes", nodes-len(db.dirties)+int(db.flushnodes), "size", storage-db.dirtiesSize+db.flushsize, "time", TimeSince(start)+db.flushtime,
 		"gcnodes", db.gcnodes, "gcsize", db.gcsize, "gctime", db.gctime, "livenodes", len(db.dirties), "livesize", db.dirtiesSize)
 
 	// Reset the garbage collection statistics

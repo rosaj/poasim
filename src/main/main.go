@@ -1,21 +1,22 @@
 package main
 
 import (
+	. "../common"
 	"../config"
 	"../network"
+	"../network/eth"
 	"../network/eth/common"
+	"../network/eth/core"
 	"../network/eth/core/types"
 	"../network/protocol"
 	"../plot"
 	"../util"
 	"crypto/ecdsa"
 	"fmt"
-
 	"github.com/agoussia/godes"
 	"github.com/ethereum/go-ethereum/crypto"
 	"math"
 	"math/big"
-	"math/rand"
 	"runtime"
 	sysTime "time"
 )
@@ -49,10 +50,11 @@ func newNodeConfig(bootstrapNodes []*network.Node) *network.NodeConfig {
 
 func runBootstrapNodes() []*network.Node {
 
-	bootstrapNodes := make([]*network.Node, 3)
+	bootstrapNodes := make([]*network.Node, 1)
 
 	for i := 0; i < len(bootstrapNodes); i++{
 		bootstrapNodes[i] = network.NewBootstrapNode(newNodeConfig(bootstrapNodes))
+		bootstrapNodes[i].NetworkID = 3
 	}
 
 	for i := 0; i < len(bootstrapNodes); i++{
@@ -65,10 +67,13 @@ func runBootstrapNodes() []*network.Node {
 }
 
 func createNodes(bootstrapNodes []*network.Node, count int) []*network.Node {
+	core.Sealers = make([]INode, 0)
+
 	nodes := make([]*network.Node, count)
 
 	for i:=0 ; i < len(nodes); i++ {
 		nodes[i] = network.NewNode(newNodeConfig(bootstrapNodes))
+		core.Sealers = append(core.Sealers, nodes[i])
 	}
 
 	return nodes
@@ -85,7 +90,7 @@ func runNodes() []*network.Node {
 	nodes := createSimNodes(bNodes)
 
 
-		for i:= 0; i < len(nodes) ; i++ {
+	for i:= 0; i < len(nodes) ; i++ {
 
 		nodeArrival := config.SimConfig.NextNodeArrival()
 
@@ -165,6 +170,7 @@ func runSim(){
 
 	//godes.Advance(5 * 60)
 
+	/*
 	//interval := 0.1
 	times := 300
 	counter := 0
@@ -187,7 +193,7 @@ func runSim(){
 
 	}
 
-
+   	 */
 
 /*
 	var testAccount, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
@@ -279,6 +285,25 @@ func waitForEnd(nodes []*network.Node)  {
 	godes.Clear()
 
 	showStats(nodes)
+
+
+	es := nodes[1].Server().(*eth.Ethereum)
+	bc := es.BlockChain()
+
+	max := bc.CurrentBlock().NumberU64()
+	util.Print("Last block", max)
+
+	for i := 1;i <= int(max) ; i+=1  {
+		hash := bc.GetBlockByNumber(uint64(i))
+
+		for y := 2; y < config.SimConfig.NodeCount; y+=1 {
+			ohash := nodes[1].Server().(*eth.Ethereum).BlockChain().GetBlockByNumber(uint64(i))
+			if hash != ohash {
+				util.Print("Hash missmatch block", i, "node", y)
+			}
+		}
+
+	}
 
 }
 

@@ -18,6 +18,8 @@
 package clique
 
 import (
+	. "../../../../config"
+	. "../../../../util"
 	"../../common"
 	"../../consensus"
 	"../../consensus/misc"
@@ -26,6 +28,7 @@ import (
 	"../../ethdb"
 	"bytes"
 	"errors"
+	"github.com/agoussia/godes"
 	"io"
 	"math/big"
 	"math/rand"
@@ -35,7 +38,6 @@ import (
 	gcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -170,6 +172,7 @@ func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, er
 // Clique is the proof-of-authority consensus engine proposed to support the
 // Ethereum testnet following the Ropsten attacks.
 type Clique struct {
+	name string
 	config *params.CliqueConfig // Consensus engine configuration parameters
 	db     ethdb.Database       // Database to store and retrieve snapshot checkpoints
 
@@ -187,7 +190,7 @@ type Clique struct {
 
 // New creates a Clique proof-of-authority consensus engine with the initial
 // signers set to the ones provided by the user.
-func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
+func New(name string, config *params.CliqueConfig, db ethdb.Database) *Clique {
 	// Set any missing consensus parameters to their defaults
 	conf := *config
 	if conf.Epoch == 0 {
@@ -198,6 +201,7 @@ func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
 	signatures, _ := lru.NewARC(inmemorySignatures)
 
 	return &Clique{
+		name: 		name,
 		config:     &conf,
 		db:         db,
 		recents:    recents,
@@ -217,24 +221,25 @@ func (c *Clique) VerifyHeader(chain consensus.ChainReader, header *types.Header,
 	return c.verifyHeader(chain, header, nil)
 }
 
+
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers. The
 // method returns a quit channel to abort the operations and a results channel to
 // retrieve the async verifications (the order is that of the input slice).
 func (c *Clique) VerifyHeaders(chain consensus.ChainReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error) {
+	c.log("Verifying headers", len(headers))
+
 	abort := make(chan struct{})
 	results := make(chan error, len(headers))
 
-	go func() {
-		for i, header := range headers {
-			err := c.verifyHeader(chain, header, headers[:i])
+	for i, header := range headers {
+		err := c.verifyHeader(chain, header, headers[:i])
 
-			select {
-			case <-abort:
-				return
-			case results <- err:
-			}
+		select {
+		case <-abort:
+			return abort, results
+		case results <- err:
 		}
-	}()
+	}
 	return abort, results
 }
 
@@ -243,13 +248,15 @@ func (c *Clique) VerifyHeaders(chain consensus.ChainReader, headers []*types.Hea
 // looking those up from the database. This is useful for concurrently verifying
 // a batch of new headers.
 func (c *Clique) verifyHeader(chain consensus.ChainReader, header *types.Header, parents []*types.Header) error {
+	c.log("VerifyHeader", header.Number)
+
 	if header.Number == nil {
 		return errUnknownBlock
 	}
 	number := header.Number.Uint64()
 
 	// Don't waste time checking blocks from the future
-	if header.Time > uint64(time.Now().Unix()) {
+	if header.Time > SecondsNow() {
 		return consensus.ErrFutureBlock
 	}
 	// Checkpoint blocks need to enforce zero beneficiary
@@ -360,7 +367,7 @@ func (c *Clique) snapshot(chain consensus.ChainReader, number uint64, hash commo
 		// If an on-disk checkpoint snapshot can be found, use that
 		if number%checkpointInterval == 0 {
 			if s, err := loadSnapshot(c.config, c.signatures, c.db, hash); err == nil {
-				log.Trace("Loaded voting snapshot from disk", "number", number, "hash", hash)
+				c.log("Loaded voting snapshot from disk", "number", number, "hash", hash)
 				snap = s
 				break
 			}
@@ -379,7 +386,7 @@ func (c *Clique) snapshot(chain consensus.ChainReader, number uint64, hash commo
 				if err := snap.store(c.db); err != nil {
 					return nil, err
 				}
-				log.Info("Stored checkpoint snapshot to disk", "number", number, "hash", hash)
+				c.log("Stored checkpoint snapshot to disk", "number", number, "hash", hash)
 				break
 			}
 		}
@@ -417,7 +424,7 @@ func (c *Clique) snapshot(chain consensus.ChainReader, number uint64, hash commo
 		if err = snap.store(c.db); err != nil {
 			return nil, err
 		}
-		log.Trace("Stored voting snapshot to disk", "number", snap.Number, "hash", snap.Hash)
+		c.log("Stored voting snapshot to disk", "number", snap.Number, "hash", snap.Hash)
 	}
 	return snap, err
 }
@@ -485,6 +492,9 @@ func (c *Clique) verifySeal(chain consensus.ChainReader, header *types.Header, p
 // Prepare implements consensus.Engine, preparing all the consensus fields of the
 // header for running the transactions on top.
 func (c *Clique) Prepare(chain consensus.ChainReader, header *types.Header) error {
+	c.log("Prepare for header", header.Number)
+
+
 	// If the block isn't a checkpoint, cast a random vote (good enough for now)
 	header.Coinbase = common.Address{}
 	header.Nonce = types.BlockNonce{}
@@ -539,8 +549,8 @@ func (c *Clique) Prepare(chain consensus.ChainReader, header *types.Header) erro
 		return consensus.ErrUnknownAncestor
 	}
 	header.Time = parent.Time + c.config.Period
-	if header.Time < uint64(time.Now().Unix()) {
-		header.Time = uint64(time.Now().Unix())
+	if now := SecondsNow(); header.Time < now {
+		header.Time = now
 	}
 	return nil
 }
@@ -552,6 +562,7 @@ func (c *Clique) Finalize(chain consensus.ChainReader, header *types.Header, sta
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 	header.UncleHash = types.CalcUncleHash(nil)
 
+	c.log("Finalize block", header.Number)
 	// Assemble and return the final block for sealing
 	return types.NewBlock(header, txs, nil, receipts), nil
 }
@@ -565,7 +576,9 @@ func (c *Clique) Authorize(signer common.Address, signFn SignerFn) {
 
 // Seal implements consensus.Engine, attempting to create a sealed block using
 // the local signing credentials.
-func (c *Clique) Seal(chain consensus.ChainReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
+func (c *Clique) Seal(chain consensus.ChainReader, block *types.Block, results func(block *types.Block)) error {
+	c.log("Sealing", block.NumberU64())
+
 	header := block.Header()
 
 	// Sealing the genesis block is not supported
@@ -575,10 +588,10 @@ func (c *Clique) Seal(chain consensus.ChainReader, block *types.Block, results c
 	}
 	// For 0-period chains, refuse to seal empty blocks (no reward but would spin sealing)
 	if c.config.Period == 0 && len(block.Transactions()) == 0 {
-		log.Info("Sealing paused, waiting for transactions")
+		c.log("Sealing paused, waiting for transactions")
 		return nil
 	}
-	// Don't hold the signer fields for the entire sealing procedure
+
 	signer, signFn := c.signer, c.signFn
 
 	// Bail out if we're unauthorized to sign a block
@@ -594,19 +607,20 @@ func (c *Clique) Seal(chain consensus.ChainReader, block *types.Block, results c
 		if recent == signer {
 			// Signer is among recents, only wait if the current block doesn't shift it out
 			if limit := uint64(len(snap.Signers)/2 + 1); number < limit || seen > number-limit {
-				log.Info("Signed recently, must wait for others")
+				c.log("Signed recently, must wait for others")
 				return nil
 			}
 		}
 	}
 	// Sweet, the protocol permits us to sign the block, wait for our time
-	delay := time.Unix(int64(header.Time), 0).Sub(time.Now()) // nolint: gosimple
+	delay := ToDuration(float64(header.Time)) - ToDuration(godes.GetSystemTime()) //time.Unix(int64(header.Time), 0).Sub(time.Now()) // nolint: gosimple
+
 	if header.Difficulty.Cmp(diffNoTurn) == 0 {
 		// It's not our turn explicitly to sign, delay it a bit
 		wiggle := time.Duration(len(snap.Signers)/2+1) * wiggleTime
 		delay += time.Duration(rand.Int63n(int64(wiggle)))
 
-		log.Trace("Out-of-turn signing requested", "wiggle", common.PrettyDuration(wiggle))
+		c.log("Out-of-turn signing requested", "wiggle", wiggle)
 	}
 	// Sign all the things!
 	sighash, err := signFn(accounts.Account{Address: gcommon.Address(signer)}, accounts.MimetypeClique, CliqueRLP(header))
@@ -615,20 +629,14 @@ func (c *Clique) Seal(chain consensus.ChainReader, block *types.Block, results c
 	}
 	copy(header.Extra[len(header.Extra)-extraSeal:], sighash)
 	// Wait until sealing is terminated or delay timeout.
-	log.Trace("Waiting for slot to sign and propagate", "delay", common.PrettyDuration(delay))
-	go func() {
-		select {
-		case <-stop:
-			return
-		case <-time.After(delay):
-		}
+	c.log("Waiting for slot to sign and propagate", "delay", delay)
 
-		select {
-		case results <- block.WithSeal(header):
-		default:
-			log.Warn("Sealing result is not read by miner", "sealhash", SealHash(header))
-		}
-	}()
+	//ovo ce pozivat neovisan runner pa se moze cekat delay sekundi
+	godes.Advance(delay.Seconds())
+
+	c.log("Sealed block", block.NumberU64())
+	//Print("Clique", c.name, "Sealed block", block.NumberU64())
+	results(block.WithSeal(header))
 
 	return nil
 }
@@ -716,5 +724,11 @@ func encodeSigHeader(w io.Writer, header *types.Header) {
 	})
 	if err != nil {
 		panic("can't encode: " + err.Error())
+	}
+}
+
+func (c *Clique) log(a ...interface{})  {
+	if LogConfig.LogConsensus {
+		Print("Clique", c.name, a)
 	}
 }

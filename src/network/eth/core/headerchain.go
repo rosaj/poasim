@@ -17,6 +17,7 @@
 package core
 
 import (
+	. "../../../util"
 	"../../eth/common"
 	"../../eth/ethdb"
 	"../consensus"
@@ -244,11 +245,14 @@ func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int)
 			log.Debug("Premature abort during headers verification")
 			return 0, errors.New("aborted")
 		}
+
+		// Otherwise wait for headers checks and ensure they pass
 		// Otherwise wait for headers checks and ensure they pass
 		if err := <-results; err != nil {
 			return i, err
 		}
 	}
+
 
 	return 0, nil
 }
@@ -261,7 +265,7 @@ func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int)
 // should be done or not. The reason behind the optional check is because some
 // of the header retrieval mechanisms already need to verfy nonces, as well as
 // because nonces can be verified sparsely, not needing to check each.
-func (hc *HeaderChain) InsertHeaderChain(chain []*types.Header, writeHeader WhCallback, start time.Time) (int, error) {
+func (hc *HeaderChain) InsertHeaderChain(chain []*types.Header, writeHeader WhCallback, start uint64) (int, error) {
 	// Collect some import statistics to report on
 	stats := struct{ processed, ignored int }{}
 	// All headers passed verification, import them into the database
@@ -285,11 +289,11 @@ func (hc *HeaderChain) InsertHeaderChain(chain []*types.Header, writeHeader WhCa
 	last := chain[len(chain)-1]
 
 	context := []interface{}{
-		"count", stats.processed, "elapsed", common.PrettyDuration(time.Since(start)),
+		"count", stats.processed, "elapsed", TimeSince(start),
 		"number", last.Number, "hash", last.Hash(),
 	}
-	if timestamp := time.Unix(int64(last.Time), 0); time.Since(timestamp) > time.Minute {
-		context = append(context, []interface{}{"age", common.PrettyAge(timestamp)}...)
+	if timestamp := last.Time; TimeSince(timestamp) > time.Minute {
+		context = append(context, []interface{}{"age", TimeSince(timestamp)}...)
 	}
 	if stats.ignored > 0 {
 		context = append(context, []interface{}{"ignored", stats.ignored}...)
