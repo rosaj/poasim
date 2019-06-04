@@ -615,6 +615,11 @@ func (c *Clique) Seal(chain consensus.ChainReader, block *types.Block, results f
 	// Sweet, the protocol permits us to sign the block, wait for our time
 	delay := ToDuration(float64(header.Time)) - ToDuration(godes.GetSystemTime()) //time.Unix(int64(header.Time), 0).Sub(time.Now()) // nolint: gosimple
 
+	// ukoliko je vec block treba bit mined onda je delay 0
+	if delay < 0 {
+		delay = 0
+	}
+
 	if header.Difficulty.Cmp(diffNoTurn) == 0 {
 		// It's not our turn explicitly to sign, delay it a bit
 		wiggle := time.Duration(len(snap.Signers)/2+1) * wiggleTime
