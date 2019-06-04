@@ -90,6 +90,7 @@ type Peer interface {
 
 
 type Downloader struct {
+	name string
 	mux  *EventFeed // Event multiplexer to announce sync operation events
 
 	peers      peerSet // Set of active peers from which download can proceed
@@ -156,8 +157,9 @@ type BlockChain interface {
 
 
 // New creates a new downloader to fetch hashes and blocks from remote peers.
-func New(mux *EventFeed, peerSet peerSet, chain BlockChain, dropPeer func(ID)) *Downloader {
+func New(name string, mux *EventFeed, peerSet peerSet, chain BlockChain, dropPeer func(ID)) *Downloader {
 	dl := &Downloader{
+		name: 			name,
 		mux:            mux,
 		peers:          peerSet,
 		blockchain:     chain,
@@ -218,12 +220,15 @@ func (d *Downloader) synchronise(id ID, hash common.Hash, td *big.Int) error {
 // syncWithPeer starts a block synchronization based on the hash chain from the
 // specified peer and head hash.
 func (d *Downloader) syncWithPeer(p Peer, hash common.Hash, td *big.Int) (err error) {
+	d.log("Posting StartEvent")
 	d.mux.Post(StartEvent{})
 	defer func() {
 		// reset on error
 		if err != nil {
+			d.log("Posting FailedEvent")
 			d.mux.Post(FailedEvent{err})
 		} else {
+			d.log("Posting DoneEvent")
 			latest := d.blockchain.CurrentHeader()
 			d.mux.Post(DoneEvent{latest})
 		}
@@ -257,11 +262,14 @@ func (d *Downloader) syncWithPeer(p Peer, hash common.Hash, td *big.Int) (err er
 			return err
 		}
 		d.log("Inserting headers", len(headers))
+
 		d.blockchain.InsertHeaderChain(headers, fsHeaderCheckFrequency)
 		for _, h := range headers {
 			headerHashes[h.Hash()] = h
 			hashes = append(hashes, h.Hash())
 		}
+
+		i += uint64(len(headers))
 	}
 
 	godes.Advance(SimConfig.NextNetworkLatency())
@@ -272,12 +280,23 @@ func (d *Downloader) syncWithPeer(p Peer, hash common.Hash, td *big.Int) (err er
 	}
 
 	blocks := make([]*types.Block, len(results))
+
+	for i, hash := range hashes {
+		result := results[hash]
+		header := headerHashes[hash]
+		blocks[i] = types.NewBlockWithHeader(header).WithBody(result.Transactions, result.Uncles)
+		d.log("Created block", blocks[i].NumberU64())
+	}
+	/*
 	i := 0
 	for hash, result := range results {
 		header := headerHashes[hash]
 		blocks[i] = types.NewBlockWithHeader(header).WithBody(result.Transactions, result.Uncles)
+		d.log("Created block", blocks[i].NumberU64())
 		i+=1
 	}
+
+	 */
 	if index, err := d.blockchain.InsertChain(blocks); err != nil {
 		if index < len(results) {
 			d.log("Downloaded item processing failed", "number", blocks[index].Header().Number, "err", err)
@@ -328,7 +347,7 @@ func (d *Downloader) DeliverHeaders(id ID, headers []*types.Header) (err error) 
 
 func (d *Downloader) log(a ...interface{})  {
 	if LogConfig.LogDownload {
-		Print("Downloader", a)
+		Print("Downloader", d.name, a)
 	}
 }
 

@@ -126,7 +126,7 @@ func NewProtocolManager(srv IServer, eventFeed 	*EventFeed, blockchain *core.Blo
 
 	}
 
-	manager.downloader = downloader.New(eventFeed, manager.peers, blockchain, manager.removePeer)
+	manager.downloader = downloader.New(srv.Self().Name(), eventFeed, manager.peers, blockchain, manager.removePeer)
 
 	validator := func(header *types.Header) error {
 		return blockchain.Engine().VerifyHeader(blockchain, header, true)

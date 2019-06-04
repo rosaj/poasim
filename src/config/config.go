@@ -101,7 +101,7 @@ var SimConfig = config {
 
 	ChurnEnabled: false,
 
-	NodeArrivalDistr: NewNormalDistr((5*time.Second.Seconds()), 0),
+	NodeArrivalDistr: NewNormalDistr((2*time.Second.Seconds()), 0),
 
 	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Hour).Seconds())),
 
@@ -139,17 +139,17 @@ var LogConfig = logConfig {
 
 	LogEthServer: false,
 
-	LogWorker: false,
+	LogWorker: true,
 
 	LogConsensus: true,
 
 	LogProtocol: false,
 
-	LogBlockchain: false,
+	LogBlockchain: true,
 
 	LogTxPool: false,
 
-	LogDownload: false,
+	LogDownload: true,
 }
 
 var MetricConfig  = metricConfig {

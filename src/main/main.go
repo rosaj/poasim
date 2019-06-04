@@ -152,6 +152,8 @@ func runSim(){
 
 	godes.Advance(config.SimConfig.NodeStabilisationTime)
 
+
+
 	/*
 	 for !config.SimConfig.SimulationEnded() {
 	 	  godes.Advance(5 * 60)
@@ -169,22 +171,21 @@ func runSim(){
 
 
 	//godes.Advance(5 * 60)
-
-	/*
-	//interval := 0.1
-	times := 300
+/*
+	interval := 0.1
+	times := 1000
 	counter := 0
 	for times > 0 {
 		times-=1
 
-		//godes.Advance(interval)
+		godes.Advance(interval)
 		//interval+=1
 		key := acc1Key
 
 		txs := make(types.Transactions,0)
 
 		//tx := types.NewTransaction(uint64(times), common.Address(acc1Addr), big.NewInt(1000), 10000, big.NewInt(1999), nil)
-		tx, _ := types.SignTx(types.NewTransaction(uint64(counter), common.Address(acc1Addr), big.NewInt(1), 1000000, big.NewInt(1), nil), types.HomesteadSigner{}, key)
+		tx, _ := types.SignTx(types.NewTransaction(uint64(counter), common.Address(acc1Addr), big.NewInt(1), 1000000, big.NewInt(10000000), nil), types.HomesteadSigner{}, key)
 		util.Print(counter, fmt.Sprintf("%x", tx.Hash()))
 		txs = append(txs, tx)
 		util.Print(rand.Intn(config.SimConfig.NodeCount))
@@ -193,7 +194,8 @@ func runSim(){
 
 	}
 
-   	 */
+ */
+
 
 /*
 	var testAccount, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
@@ -244,6 +246,7 @@ func runSim(){
 
 */
 
+
 	waitForEnd(nodes)
 
 }
@@ -291,18 +294,32 @@ func waitForEnd(nodes []*network.Node)  {
 	bc := es.BlockChain()
 
 	max := bc.CurrentBlock().NumberU64()
+//	hash := bc.CurrentBlock().Hash()
+
 	util.Print("Last block", max)
 
-	for i := 1;i <= int(max) ; i+=1  {
-		hash := bc.GetBlockByNumber(uint64(i))
+	for i := 1; i <= config.SimConfig.NodeCount ; i+=1  {
+		ob := nodes[i].Server().(*eth.Ethereum).BlockChain().CurrentBlock()
+		util.Print(i, ob.NumberU64())
 
-		for y := 2; y < config.SimConfig.NodeCount; y+=1 {
-			ohash := nodes[1].Server().(*eth.Ethereum).BlockChain().GetBlockByNumber(uint64(i))
-			if hash != ohash {
-				util.Print("Hash missmatch block", i, "node", y)
-			}
+		/*
+		ob := nodes[i].Server().(*eth.Ethereum).BlockChain().GetBlockByNumber(uint64(max))
+		if ob == nil || hash != ob.Hash() {
+			util.Print("Hash missmatch block", max, "node", i)
 		}
 
+		 */
+	}
+
+
+
+	for i := max;i >= 1 ; i-=1  {
+		block := bc.GetBlockByNumber(uint64(i))
+		if block != nil {
+			util.Print(block.Number(), "tx count", block.Transactions().Len())
+		} else {
+			util.Print("block", i, "je nil")
+		}
 	}
 
 }

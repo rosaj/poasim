@@ -77,6 +77,7 @@ func New(name string, eth Backend, config *Config, chainConfig *params.ChainConf
 		exitCh:   make(chan struct{}),
 		worker:   newWorker(name, config, chainConfig, engine, eth, mux, isLocalBlock),
 		canStart: 1,
+		shouldStart: 1,
 	}
 
 	miner.update()
@@ -135,6 +136,7 @@ func (self *Miner) Start(coinbase common.Address) {
 }
 
 func (self *Miner) Stop() {
+	self.log("stopping mining")
 	self.worker.stop()
 	atomic.StoreInt32(&self.shouldStart, 0)
 }

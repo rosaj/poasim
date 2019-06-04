@@ -148,13 +148,13 @@ func (f *Fetcher) insert(peer IPeer, block *types.Block) error {
 	//hash := block.Hash()
 
 	// Run the import on a new thread
-	f.log("Importing propagated block", "peer", peer.Name(), "number", block.Number())
+	f.log("Importing propagated block", "number", block.Number(), "from peer",peer.Name(), )
 
 	// If the parent's unknown, abort insertion
 	parent := f.getBlock(block.ParentHash())
 	if parent == nil {
 		//f.log("Unknown parent of propagated block", "peer", peer.Name(), "number", block.Number(), "hash", hash, "parent", block.ParentHash())
-		return errors.New(fmt.Sprintf("Unknown parent of propagated block peer %s number %d", peer.Name(), block.Number()))
+		return errors.New(fmt.Sprintf("Unknown parent of propagated block number %d from peer %s ", block.Number(), peer.Name()))
 	}
 	// Quickly validate the header and propagate the block if it passes
 	switch err := f.verifyHeader(block.Header()); err {
@@ -169,12 +169,12 @@ func (f *Fetcher) insert(peer IPeer, block *types.Block) error {
 		// Something went very wrong, drop the peer
 		//f.log("Propagated block verification failed", "peer", peer.Name(), "number", block.Number(), "hash", hash, "err", err)
 		f.dropPeer(peer.ID())
-		return errors.New(fmt.Sprintf("Propagated block verification failed peer %s number %d", peer.Name(), block.Number()))
+		return errors.New(fmt.Sprintf("Propagated block verification failed number %d peer %s ", block.Number(), peer.Name()))
 	}
 	// Run the actual import and log any issues
 	if _, err := f.insertChain(types.Blocks{block}); err != nil {
 		//f.log("Propagated block import failed", "peer", peer.Name(), "number", block.Number(), "hash", hash, "err", err)
-		return errors.New(fmt.Sprintf("Propagated block import failed peer %s number %d", peer.Name(), block.Number()))
+		return errors.New(fmt.Sprintf("Propagated block import failed  number %d peer %s",block.Number(), peer.Name()))
 	}
 	// If import succeeded, broadcast the block
 	f.broadcastBlock(block, false)

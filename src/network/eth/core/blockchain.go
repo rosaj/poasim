@@ -39,7 +39,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -421,7 +420,7 @@ func (bc *BlockChain) ResetWithGenesisBlock(genesis *types.Block) error {
 
 	// Prepare the genesis block and reinitialise the chain
 	if err := bc.hc.WriteTd(genesis.Hash(), genesis.NumberU64(), genesis.Difficulty()); err != nil {
-		log.Crit("Failed to write genesis block TD", "err", err)
+		bc.log("CRITICAL: Failed to write genesis block TD", "err", err)
 	}
 	rawdb.WriteBlock(bc.db, genesis)
 
@@ -696,6 +695,7 @@ func (bc *BlockChain) Stop() {
 
 	atomic.StoreInt32(&bc.procInterrupt, 1)
 
+	/*
 
 	// Ensure the state of a recent block is also stored to disk before exiting.
 	// We're writing three different states to catch different restart scenarios:
@@ -722,6 +722,7 @@ func (bc *BlockChain) Stop() {
 			bc.log("Dangling trie nodes after full cleanup")
 		}
 	}
+	*/
 	bc.log("Blockchain manager stopped")
 }
 
@@ -1144,7 +1145,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 	for ; block != nil && err == nil; block, err = it.next() {
 		// If the chain is terminating, stop processing blocks
 		if atomic.LoadInt32(&bc.procInterrupt) == 1 {
-			log.Debug("Premature abort during blocks processing")
+			bc.log("Premature abort during blocks processing")
 			break
 		}
 
@@ -1229,7 +1230,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 
 		switch status {
 		case CanonStatTy:
-			log.Debug("Inserted new block", "number", block.Number(), "hash", block.Hash(),
+			bc.log("Inserted new block", "number", block.Number(), "hash", block.Hash(),
 				"uncles", len(block.Uncles()), "txs", len(block.Transactions()), "gas", block.GasUsed(),
 				"elapsed", TimeSince(start),
 				"root", block.Root())
@@ -1242,7 +1243,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 			bc.gcproc += proctime
 
 		case SideStatTy:
-			log.Debug("Inserted forked block", "number", block.Number(), "hash", block.Hash(),
+			bc.log("Inserted forked block", "number", block.Number(), "hash", block.Hash(),
 				"diff", block.Difficulty(), "elapsed", TimeSince(start),
 				"txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()),
 				"root", block.Root())
@@ -1327,7 +1328,7 @@ func (bc *BlockChain) insertSidechain(block *types.Block, it *insertIterator) (i
 			if err := bc.WriteBlockWithoutState(block, externTd); err != nil {
 				return it.index, nil, nil, err
 			}
-			log.Debug("Injected sidechain block", "number", block.Number(), "hash", block.Hash(),
+			bc.log("Injected sidechain block", "number", block.Number(), "hash", block.Hash(),
 				"diff", block.Difficulty(), "elapsed", TimeSince(start),
 				"txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()),
 				"root", block.Root())
@@ -1383,7 +1384,7 @@ func (bc *BlockChain) insertSidechain(block *types.Block, it *insertIterator) (i
 
 			// If the chain is terminating, stop processing blocks
 			if atomic.LoadInt32(&bc.procInterrupt) == 1 {
-				log.Debug("Premature abort during blocks processing")
+				bc.log("Premature abort during blocks processing")
 				return 0, nil, nil, nil
 			}
 		}
