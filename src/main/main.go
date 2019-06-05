@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"math"
 	"math/big"
+	"math/rand"
 	"runtime"
 	sysTime "time"
 )
@@ -169,11 +170,9 @@ func runSim(){
 	*/
 
 
-
 	//godes.Advance(5 * 60)
-/*
-	interval := 0.1
-	times := 1000
+	interval := 1.0
+	times := 100
 	counter := 0
 	for times > 0 {
 		times-=1
@@ -185,7 +184,7 @@ func runSim(){
 		txs := make(types.Transactions,0)
 
 		//tx := types.NewTransaction(uint64(times), common.Address(acc1Addr), big.NewInt(1000), 10000, big.NewInt(1999), nil)
-		tx, _ := types.SignTx(types.NewTransaction(uint64(counter), common.Address(acc1Addr), big.NewInt(1), 1000000, big.NewInt(10000000), nil), types.HomesteadSigner{}, key)
+		tx, _ := types.SignTx(types.NewTransaction(uint64(counter), common.Address(acc1Addr), big.NewInt(1), 1000000, big.NewInt(10000000000), nil), types.HomesteadSigner{}, key)
 		util.Print(counter, fmt.Sprintf("%x", tx.Hash()))
 		txs = append(txs, tx)
 		util.Print(rand.Intn(config.SimConfig.NodeCount))
@@ -194,7 +193,7 @@ func runSim(){
 
 	}
 
- */
+
 
 
 /*

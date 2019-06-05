@@ -632,12 +632,11 @@ func (c *Clique) Seal(chain consensus.ChainReader, block *types.Block, results f
 	c.log("Waiting for slot to sign and propagate", "delay", delay)
 
 	// ukoliko je vec block treba bit mined onda je delay 0
-	if delay < 0 {
-		delay = 0
+	if delay > 0 {
+		//ovo ce pozivat neovisan runner pa se moze cekat delay sekundi
+		godes.Advance(delay.Seconds())
 	}
 
-	//ovo ce pozivat neovisan runner pa se moze cekat delay sekundi
-	godes.Advance(delay.Seconds())
 
 	c.log("Sealed block", block.NumberU64())
 	//Print("Clique", c.name, "Sealed block", block.NumberU64())

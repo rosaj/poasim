@@ -104,9 +104,10 @@ func newPeer(version int, p IPeer, pm *ProtocolManager) *peer {
 // writer that does not lock up node internals.
 func (p *peer) broadcast() {
 	if p.broadcasting || p.IsClosed() {
+		p.Log("Peer already broadcasting skipping broadcast")
 		return
 	}
-
+	p.Log("Broadcasting")
 	select {
 	case txs := <-p.queuedTxs:
 
@@ -123,6 +124,7 @@ func (p *peer) broadcast() {
 		p.Log("Announced block", "number", block.Number(), "hash", block.Hash())
 
 	default:
+		p.Log("Nothing to broadcast")
 		return
 	}
 }

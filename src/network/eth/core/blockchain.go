@@ -1166,15 +1166,13 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 
 		if !bc.cacheConfig.TrieCleanNoPrefetch {
 			if followup, err := it.peek(); followup != nil && err == nil {
-				go func(start uint64) {
-					throwaway, _ := state.New(parent.Root, bc.stateCache)
-					bc.prefetcher.Prefetch(followup, throwaway, &followupInterrupt)
+				throwaway, _ := state.New(parent.Root, bc.stateCache)
+				bc.prefetcher.Prefetch(followup, throwaway, &followupInterrupt)
 
-				//	blockPrefetchExecuteTimer.Update(time.Since(start))
-					if atomic.LoadUint32(&followupInterrupt) == 1 {
-						blockPrefetchInterruptMeter.Mark(1)
-					}
-				}(SecondsNow())
+			//	blockPrefetchExecuteTimer.Update(time.Since(start))
+				if atomic.LoadUint32(&followupInterrupt) == 1 {
+					blockPrefetchInterruptMeter.Mark(1)
+				}
 			}
 		}
 		// Process block using the parent state as reference point

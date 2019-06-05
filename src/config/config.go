@@ -93,7 +93,7 @@ type metricConfig struct {
 
 var SimConfig = config {
 
-	SimulationTime: (1 * 30 * time.Minute).Seconds(),
+	SimulationTime: (1 * 10 * time.Minute).Seconds(),
 
 	NodeCount: 6,
 
@@ -101,7 +101,7 @@ var SimConfig = config {
 
 	ChurnEnabled: false,
 
-	NodeArrivalDistr: NewNormalDistr((2*time.Second.Seconds()), 0),
+	NodeArrivalDistr: NewNormalDistr((3*time.Second.Seconds()), 0),
 
 	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Hour).Seconds())),
 
@@ -125,29 +125,29 @@ var LogConfig = logConfig {
 
 	Logging: true,
 
-	LogMessages: false,
+	LogMessages: true,
 
-	LogDialing: false,
+	LogDialing: true,
 
-	LogNode: false,
+	LogNode: true,
 
-	LogPeer: false,
+	LogPeer: true,
 
 	LogDiscovery: false,
 
-	LogServer: false,
+	LogServer: true,
 
-	LogEthServer: false,
+	LogEthServer: true,
 
 	LogWorker: true,
 
 	LogConsensus: true,
 
-	LogProtocol: false,
+	LogProtocol: true,
 
 	LogBlockchain: true,
 
-	LogTxPool: false,
+	LogTxPool: true,
 
 	LogDownload: true,
 }

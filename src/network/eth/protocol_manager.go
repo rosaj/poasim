@@ -566,11 +566,11 @@ func (pm *ProtocolManager) pendingCount() int  {
 
 func (pm *ProtocolManager) AddTxs(txs types.Transactions) {
 
-	Print(pm.self(), "Added txs", len(txs), "pending", pm.pendingCount())
+	pm.log("Added txs", len(txs), "pending", pm.pendingCount())
 	errors := pm.txpool.AddRemotes(txs)
 
 	for k, v := range errors {
-		Print(pm.self(), "Err", k, v)
+		pm.log( "Err", k, v)
 	}
 }
 

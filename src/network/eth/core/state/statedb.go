@@ -222,12 +222,14 @@ func (self *StateDB) Empty(addr common.Address) bool {
 
 // Retrieve the balance from the given address or 0 if object not found
 func (self *StateDB) GetBalance(addr common.Address) *big.Int {
+	/*
 	stateObject := self.getStateObject(addr)
 	if stateObject != nil {
 		return stateObject.Balance()
 	}
-	//TODO: balance
-	return big.NewInt(11111111110)
+	*/
+	//TODO: balance nije fiksan :D
+	return big.NewInt(1111111100000001110)
 }
 
 func (self *StateDB) GetNonce(addr common.Address) uint64 {

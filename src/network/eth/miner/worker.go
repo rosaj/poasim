@@ -315,7 +315,7 @@ func (w *worker) commitWork(noempty bool, s int32) {
 	}
 	 w.recommit = time.Duration(int64(next))
 
-	 w.log("recalcReccomit", w.recommit)
+	 w.log("recalcRecommit", w.recommit)
 }
 
 func (w *worker) startWork()  {
