@@ -171,7 +171,7 @@ func runSim(){
 
 	//godes.Advance(5 * 60)
 	interval := 1.0
-	times := 100
+	times := 5
 	counter := 0
 	for times > 0 {
 		times-=1
@@ -184,14 +184,12 @@ func runSim(){
 
 		//tx := types.NewTransaction(uint64(times), common.Address(acc1Addr), big.NewInt(1000), 10000, big.NewInt(1999), nil)
 		tx, _ := types.SignTx(types.NewTransaction(uint64(counter), common.Address(acc1Addr), big.NewInt(1), 1000000, big.NewInt(10000000000), nil), types.HomesteadSigner{}, key)
-		util.Print(counter, fmt.Sprintf("%x", tx.Hash()))
+		util.Print(counter, tx.Nonce())
 		txs = append(txs, tx)
 		util.Print(rand.Intn(config.SimConfig.NodeCount))
 		nodes[rand.Intn(config.SimConfig.NodeCount)].Server().GetProtocolManager().AddTxs(txs)
 		counter += 1
-
 	}
-
 
 
 /*

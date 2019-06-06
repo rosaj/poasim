@@ -539,9 +539,8 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 		pm.log("Broadcast transaction", "hash", tx.Hash(), "recipients", len(peers))
 	}
 	// FIXME include this again: peers = peers[:int(math.Sqrt(float64(len(peers))))]
-	pm.log("Broadcast txs", len(txs))
 
-	Print(pm.self(), "Sending txs", len(txs), "pending", pm.pendingCount())
+	pm.log("Broadcast txs", len(txs),  "pending", pm.pendingCount())
 
 	for peer, txs := range txset {
 		peer.AsyncSendTransactions(txs)
@@ -556,12 +555,7 @@ func (pm *ProtocolManager) broadcastMinedBlock(data interface{}) {
 	}
 }
 func (pm *ProtocolManager) pendingCount() int  {
-	pending:= pm.txpool.Pending()
-	count := 0
-	for _, v := range pending {
-		count += len(v)
-	}
-	return count
+	return pm.txpool.PendingCount()
 }
 
 func (pm *ProtocolManager) AddTxs(txs types.Transactions) {

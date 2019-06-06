@@ -226,7 +226,6 @@ type TxPool struct {
 	all     *txLookup                    // All transactions to allow lookups
 	priced  *txPricedList                // All transactions sorted by price
 
-	homestead bool
 	head *types.Block
 }
 
@@ -278,10 +277,7 @@ func (pool *TxPool) handleChainHead(headEvent ChainHeadEvent)  {
 
 	if headEvent.Block != nil {
 
-		if pool.chainconfig.IsHomestead(headEvent.Block.Number()) {
-			pool.homestead = true
-		}
-
+		pool.log("Received ChainHeadEvent")
 		pool.reset(pool.head.Header(), headEvent.Block.Header())
 		pool.head = headEvent.Block
 
@@ -320,6 +316,9 @@ func (pool *TxPool) loop() {
 // reset retrieves the current state of the blockchain and ensures the content
 // of the transaction pool is valid with regard to the chain state.
 func (pool *TxPool) reset(oldHead, newHead *types.Header) {
+	pool.log("Reseting pool with new head", newHead.Number)
+
+
 	// If we're reorging an old state, reinject all dropped transactions
 	var reinject types.Transactions
 
@@ -415,6 +414,8 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	// Check the queue and move transactions over to the pending if possible
 	// or remove those that have become invalid
 	pool.promoteExecutables(nil)
+
+	pool.log("Pending transactions after reset", pool.PendingCount())
 }
 
 // Stop terminates the transaction pool.
@@ -506,6 +507,17 @@ func (pool *TxPool) Pending() (map[common.Address]types.Transactions) {
 	return pending
 }
 
+
+func (pool *TxPool) PendingCount() int  {
+	pending:= pool.Pending()
+	count := 0
+	for _, v := range pending {
+		count += len(v)
+	}
+	return count
+}
+
+
 // Locals retrieves the accounts currently considered local by the pool.
 func (pool *TxPool) Locals() []common.Address {
 	return pool.locals.flatten()
@@ -563,7 +575,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	if pool.currentState.GetBalance(from).Cmp(tx.Cost()) < 0 {
 		return ErrInsufficientFunds
 	}
-	intrGas, err := IntrinsicGas(tx.Data(), tx.To() == nil, pool.homestead)
+	intrGas, err := IntrinsicGas(tx.Data(), tx.To() == nil)
 	if err != nil {
 		return err
 	}
@@ -1090,7 +1102,6 @@ func (pool *TxPool) demoteUnexecutables() {
 }
 
 func (pool *TxPool) String() string {
-	//TODO: pool name
 	return fmt.Sprintf("TxPool %s", pool.name)
 }
 

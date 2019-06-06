@@ -290,9 +290,9 @@ func (s *Ethereum) StartMining() error {
 		atomic.StoreUint32(&s.protocolManager.acceptTxs, 1)
 
 		s.miner.SetEtherbase(eb)
-		if s.Self().Name() == "2" {
+	//	if s.Self().Name() == "2" {
 			s.miner.Start(eb)
-		}
+//		}
 	}
 
 	s.log("Starting to mine")

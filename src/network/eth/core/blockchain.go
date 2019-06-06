@@ -902,7 +902,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	}
 	rawdb.WriteBlock(bc.db, block)
 
-	root, err := state.Commit(bc.chainConfig.IsEIP158(block.Number()))
+	root, err := state.Commit(true)
 	if err != nil {
 		return NonStatTy, err
 	}
@@ -1179,10 +1179,12 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 		substart := SecondsNow()
 		receipts, logs, usedGas, err := bc.processor.Process(block, statedb)
 		if err != nil {
+			bc.log("Processing/ApplyTransaction failed with err", err)
 			bc.reportBlock(block, receipts, err)
 			atomic.StoreUint32(&followupInterrupt, 1)
 			return it.index, events, coalescedLogs, err
 		}
+		bc.log("Process/ApplyTransaction gasUsed", usedGas, "receipt", receipts)
 		// Update the metrics touched during block processing
 		accountReadTimer.Update(statedb.AccountReads)     // Account reads are complete, we can mark them
 		storageReadTimer.Update(statedb.StorageReads)     // Storage reads are complete, we can mark them

@@ -71,6 +71,7 @@ type txPool interface {
 	// The slice should be modifiable by the caller.
 	Pending() map[common.Address]types.Transactions
 
+	PendingCount() int
 	// SubscribeNewTxsEvent should return an event subscription of
 	// NewTxsEvent and send events to the given channel.
 	SubscribeNewTxsEvent(txFeedFunc func(txEvent NewTxsEvent))
