@@ -101,7 +101,7 @@ var SimConfig = config {
 
 	ChurnEnabled: false,
 
-	NodeArrivalDistr: NewNormalDistr((3*time.Second.Seconds()), 0),
+	NodeArrivalDistr: NewNormalDistr((7*time.Second.Seconds()), 0),
 
 	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Hour).Seconds())),
 
@@ -125,25 +125,25 @@ var LogConfig = logConfig {
 
 	Logging: true,
 
-	LogMessages: true,
+	LogMessages: false,
 
-	LogDialing: true,
+	LogDialing: false,
 
-	LogNode: true,
+	LogNode: false,
 
-	LogPeer: true,
+	LogPeer: false,
 
 	LogDiscovery: false,
 
-	LogServer: true,
+	LogServer: false,
 
-	LogEthServer: true,
+	LogEthServer: false,
 
 	LogWorker: true,
 
 	LogConsensus: true,
 
-	LogProtocol: true,
+	LogProtocol: false,
 
 	LogBlockchain: true,
 

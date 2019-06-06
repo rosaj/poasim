@@ -209,6 +209,8 @@ func newWorker(name string, config *Config, chainConfig *params.ChainConfig, eng
 		worker.recommit = minRecommitInterval
 	}
 
+	worker.minRecommit = worker.recommit
+
 	worker.newWorkLoop()
 
 	// Submit first work to initialize pending state.
@@ -369,6 +371,7 @@ func (w *worker) newWorkLoop() {
 func (w *worker) Run()  {
 
 	for {
+
 		godes.Advance(w.recommitTime.Seconds())
 
 		// If mining is running resubmit a new work cycle periodically to pull in
@@ -505,7 +508,7 @@ func (w *worker) handleResult(block *types.Block)  {
 		return
 	}
 
-	w.log("Seal block result", block.NumberU64())
+	w.log("Seal block result", block.NumberU64(), "with tx count", len(block.Transactions()))
 
 	// Short circuit when receiving duplicate result caused by resubmitting.
 	if w.chain.HasBlock(block.Hash(), block.NumberU64()) {

@@ -169,7 +169,6 @@ func runSim(){
 	 }
 	*/
 
-
 	//godes.Advance(5 * 60)
 	interval := 1.0
 	times := 100
@@ -192,7 +191,6 @@ func runSim(){
 		counter += 1
 
 	}
-
 
 
 
@@ -289,7 +287,7 @@ func waitForEnd(nodes []*network.Node)  {
 	showStats(nodes)
 
 
-	es := nodes[1].Server().(*eth.Ethereum)
+	es := nodes[0].Server().(*eth.Ethereum)
 	bc := es.BlockChain()
 
 	max := bc.CurrentBlock().NumberU64()
@@ -297,7 +295,7 @@ func waitForEnd(nodes []*network.Node)  {
 
 	util.Print("Last block", max)
 
-	for i := 1; i <= config.SimConfig.NodeCount ; i+=1  {
+	for i := 0; i < config.SimConfig.NodeCount ; i+=1  {
 		ob := nodes[i].Server().(*eth.Ethereum).BlockChain().CurrentBlock()
 		util.Print(i, ob.NumberU64())
 
