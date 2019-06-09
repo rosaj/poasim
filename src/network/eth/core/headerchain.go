@@ -23,6 +23,7 @@ import (
 	"../consensus"
 	"../core/rawdb"
 	"../core/types"
+	"../params"
 
 	crand "crypto/rand"
 	"errors"
@@ -34,7 +35,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
 
 	lru "github.com/hashicorp/golang-lru"
 )

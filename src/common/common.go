@@ -1,7 +1,7 @@
 package common
 
 import (
-	//TODO: interface za transakcije?
+	"../config"
 	"../network/eth/common"
 	"../network/eth/core/types"
 	"crypto/ecdsa"
@@ -31,6 +31,8 @@ type INode interface {
 	GetBootstrapNodes() []INode
 	GetNetworkID() int
 	GetProtocols() []string
+
+	GetConfig() *config.EthereumConfig
 }
 
 
@@ -103,6 +105,7 @@ type IProtocolManager interface {
 	RetrieveHandshakePeer(node INode) IPeer
 	GetSubProtocols() []IProtocol
 
-	AddTxs(txs types.Transactions)
+	AddTxs(txs types.Transactions) []error
+	PendingTxCount() int
 
 }

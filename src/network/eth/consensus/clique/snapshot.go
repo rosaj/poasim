@@ -17,6 +17,7 @@
 package clique
 
 import (
+	"../../../eth/params"
 	"../../common"
 	"../../core/types"
 	"../../ethdb"
@@ -24,7 +25,6 @@ import (
 	"encoding/json"
 	"sort"
 
-	"github.com/ethereum/go-ethereum/params"
 	lru "github.com/hashicorp/golang-lru"
 )
 

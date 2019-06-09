@@ -18,12 +18,14 @@
 package trie
 
 import (
-	"../../eth/common"
+	. "../../../config"
+
+	. "../../../util"
+	"../common"
 	"bytes"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 var (
@@ -88,7 +90,7 @@ func (t *Trie) NodeIterator(start []byte) NodeIterator {
 func (t *Trie) Get(key []byte) []byte {
 	res, err := t.TryGet(key)
 	if err != nil {
-		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
+		t.log(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
 	return res
 }
@@ -149,7 +151,7 @@ func (t *Trie) tryGet(origNode node, key []byte, pos int) (value []byte, newnode
 // stored in the trie.
 func (t *Trie) Update(key, value []byte) {
 	if err := t.TryUpdate(key, value); err != nil {
-		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
+		t.log(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
 }
 
@@ -251,7 +253,7 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 // Delete removes any existing value for key from the trie.
 func (t *Trie) Delete(key []byte) {
 	if err := t.TryDelete(key); err != nil {
-		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
+		t.log(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
 }
 
@@ -430,4 +432,10 @@ func (t *Trie) hashRoot(db *Database, onleaf LeafCallback) (node, node, error) {
 	h := newHasher(onleaf)
 	defer returnHasherToPool(h)
 	return h.hash(t.root, db, true)
+}
+
+func (t *Trie) log(a ...interface{})  {
+	if LogConfig.LogDatabase {
+		Print("Trie", a)
+	}
 }

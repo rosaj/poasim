@@ -10,12 +10,11 @@ import (
 	"../eth/downloader"
 	. "../eth/event_feed"
 	"../eth/fetcher"
+	"../eth/params"
 	. "../message"
 	. "../protocol"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/params"
 	"math"
 	"math/big"
 	"sync/atomic"
@@ -73,15 +72,6 @@ type ProtocolManager struct {
 
 	SubProtocols []IProtocol
 
-	minedBlockSub *event.TypeMuxSubscription
-
-	whitelist map[uint64]common.Hash
-
-	// channels for fetcher, syncer, txsyncLoop
-	txsyncCh    chan *txsync
-	newPeerCh   chan *peer
-	quitSync    chan struct{}
-
 	txSyncManager *txSyncManager
 
 }
@@ -99,8 +89,6 @@ func NewProtocolManager(srv IServer, eventFeed 	*EventFeed, blockchain *core.Blo
 		networkID:   srv.Self().GetNetworkID(),
 		peers:       newPeerSet(),
 		handshakePeers: newPeerSet(),
-		newPeerCh:   make(chan *peer),
-		quitSync:    make(chan struct{}),
 		maxPeers:  	 srv.Self().GetMaxPeers(),
 		eventFeed:   eventFeed,
 	}
@@ -139,7 +127,7 @@ func NewProtocolManager(srv IServer, eventFeed 	*EventFeed, blockchain *core.Blo
 		return manager.blockchain.InsertChain(blocks)
 	}
 
-	manager.fetcher = fetcher.New(blockchain.GetBlockByHash, validator, manager.BroadcastBlock, heighter, inserter, manager.removePeer)
+	manager.fetcher = fetcher.New(srv.Self().Name(), blockchain.GetBlockByHash, validator, manager.BroadcastBlock, heighter, inserter, manager.removePeer)
 
 
 	return manager
@@ -194,7 +182,7 @@ func (pm *ProtocolManager) Start() {
 	})
 
 	// broadcast mined blocks
-	pm.eventFeed.Subscribe(core.NewMinedBlockEvent{}, pm.broadcastMinedBlock)
+	pm.eventFeed.Subscribe(pm.broadcastMinedBlock, core.NewMinedBlockEvent{})
 
 
 	// start sync handlers
@@ -220,8 +208,6 @@ func (pm *ProtocolManager) Stop() {
 	pm.log("Stopping Ethereum protocol")
 
 	pm.txSyncManager.stop()
-
-//	pm.minedBlockSub.Unsubscribe() // quits blockBroadcastLoop
 
 	// Disconnect existing sessions.
 	// This also closes the gate for any new registrations on the peer set.
@@ -270,14 +256,6 @@ func (pm *ProtocolManager) handle(p *peer) {
 			p.HandleError(err)
 			return
 		}
-
-		/*
-		// Register the peer in the downloader. If the downloader considers it banned, we disconnect
-		if err := pm.downloader.RegisterPeer(p.id, p.version, p); err != nil {
-			p.HandleError(err)
-			return
-		}
-		*/
 
 		pm.syncTransactions(p)
 		pm.synchroniseNewPeer(p)
@@ -514,6 +492,7 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 			peer.AsyncSendNewBlock(block, td)
 		}
 		pm.log("Propagated block", block.NumberU64(), "recipients", len(transfer), "duration", TimeSince(block.ReceivedAt))
+
 		return
 	}
 	// Otherwise if the block is indeed in out own chain, announce it
@@ -540,7 +519,7 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 	}
 	// FIXME include this again: peers = peers[:int(math.Sqrt(float64(len(peers))))]
 
-	pm.log("Broadcast txs", len(txs),  "pending", pm.pendingCount())
+	pm.log("Broadcast txs", len(txs),  "pending", pm.PendingTxCount())
 
 	for peer, txs := range txset {
 		peer.AsyncSendTransactions(txs)
@@ -554,18 +533,21 @@ func (pm *ProtocolManager) broadcastMinedBlock(data interface{}) {
 		pm.BroadcastBlock(ev.Block, false) // Only then announce to the rest
 	}
 }
-func (pm *ProtocolManager) pendingCount() int  {
+func (pm *ProtocolManager) PendingTxCount() int  {
 	return pm.txpool.PendingCount()
 }
 
-func (pm *ProtocolManager) AddTxs(txs types.Transactions) {
+func (pm *ProtocolManager) AddTxs(txs types.Transactions) []error {
 
-	pm.log("Added txs", len(txs), "pending", pm.pendingCount())
+	pm.log("Added txs", len(txs), "pending", pm.PendingTxCount())
 	errors := pm.txpool.AddRemotes(txs)
-
+/*
 	for k, v := range errors {
 		pm.log( "Err", k, v)
 	}
+	*/
+
+	return errors
 }
 
 

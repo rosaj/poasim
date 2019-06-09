@@ -19,12 +19,12 @@ package core
 import (
 	"../common"
 	"../core/vm"
+	"../params"
 	"errors"
 	"math"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
 )
 
 var (
@@ -203,6 +203,7 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		// error.
 		vmerr error
 	)
+
 	// Increment the nonce for the next transaction
 	st.state.SetNonce(msg.From(), st.state.GetNonce(sender)+1)
 	ret, st.gas, vmerr = evm.Call(vm.AccountRef(sender), st.to(), st.data, st.gas, st.value)

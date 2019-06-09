@@ -22,8 +22,7 @@ import (
 	"../consensus"
 	"../core/state"
 	"../core/types"
-
-	"github.com/ethereum/go-ethereum/params"
+	"../params"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning

@@ -26,11 +26,9 @@ import (
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-//	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-//go:generate gencodec -type txdata -field-override txdataMarshaling -out gen_tx_json.go
 
 var (
 	ErrInvalidSig = errors.New("invalid transaction v, r, s values")

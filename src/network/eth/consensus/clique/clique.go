@@ -20,9 +20,9 @@ package clique
 import (
 	. "../../../../config"
 	. "../../../../util"
+	"../../../eth/params"
 	"../../common"
 	"../../consensus"
-	"../../consensus/misc"
 	"../../core/state"
 	"../../core/types"
 	"../../ethdb"
@@ -38,7 +38,6 @@ import (
 	gcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 
@@ -299,10 +298,6 @@ func (c *Clique) verifyHeader(chain consensus.ChainReader, header *types.Header,
 		if header.Difficulty == nil || (header.Difficulty.Cmp(diffInTurn) != 0 && header.Difficulty.Cmp(diffNoTurn) != 0) {
 			return errInvalidDifficulty
 		}
-	}
-	// If all checks passed, validate any special fields for hard forks
-	if err := misc.VerifyForkHashes(chain.Config(), header, false); err != nil {
-		return err
 	}
 	// All basic checks passed, verify cascading fields
 	return c.verifyCascadingFields(chain, header, parents)
@@ -577,7 +572,8 @@ func (c *Clique) Authorize(signer common.Address, signFn SignerFn) {
 // Seal implements consensus.Engine, attempting to create a sealed block using
 // the local signing credentials.
 func (c *Clique) Seal(chain consensus.ChainReader, block *types.Block, results func(block *types.Block)) error {
-	c.log("Sealing", block.NumberU64())
+	c.log("Sealing", block.NumberU64(), "with txs count", block.Transactions().Len())
+//	Print("Clique", c.name, "Sealing", block.NumberU64(), "with txs count", block.Transactions().Len())
 
 	header := block.Header()
 

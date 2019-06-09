@@ -36,6 +36,7 @@ func nodeCountChanged(arrival bool)  {
 }
 
 type NodeConfig struct {
+	*EthereumConfig
 
 	MaxPeers 		int
 
@@ -185,6 +186,10 @@ func (n *Node) GetUDP() IUdp {
 	return n.udp
 }
 
+func (n *Node) GetConfig() *EthereumConfig {
+	return n.EthereumConfig
+}
+
 func (n *Node) GetTableStats() map[float64][]int {
 	return n.tab.GetTableStats()
 }
@@ -263,7 +268,7 @@ func (n *Node) startP2P()  {
 
 func (n *Node) startServer()  {
 	var err error
-	n.server, err = eth.New(n, nil) //devp2p.NewServer(n)
+	n.server, err = eth.New(n) //devp2p.NewServer(n)
 	if err != nil {
 		n.log(err)
 		return

@@ -27,13 +27,13 @@ import (
 	"../core"
 	"../core/state"
 	"../core/types"
+	"../params"
 	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/params"
 )
 
 // Backend wraps all methods required for mining.
@@ -90,10 +90,10 @@ func New(name string, eth Backend, config *Config, chainConfig *params.ChainConf
 // the loop is exited. This to prevent a major security vuln where external parties can DOS you with blocks
 // and halt your mining operation for as long as the DOS continues.
 func (self *Miner) update() {
-	self.mux.SubscribeMultiple(func(ev interface{}) {
+	self.mux.Subscribe(func(ev interface{}) {
 
 			if ev == nil {
-				self.mux.SubscribeMultiple(nil, downloader.StartEvent{}, downloader.DoneEvent{}, downloader.FailedEvent{})
+				self.cancelSubscription()
 				return
 			}
 			switch ev.(type) {
@@ -116,11 +116,14 @@ func (self *Miner) update() {
 					self.Start(self.coinbase)
 				}
 				// stop immediately and ignore all further pending events
-				self.mux.SubscribeMultiple(nil, downloader.StartEvent{}, downloader.DoneEvent{}, downloader.FailedEvent{})
+				self.cancelSubscription()
 				return
 			}
 	}, downloader.StartEvent{}, downloader.DoneEvent{}, downloader.FailedEvent{})
 
+}
+func (self *Miner) cancelSubscription()  {
+	self.mux.Subscribe(nil, downloader.StartEvent{}, downloader.DoneEvent{}, downloader.FailedEvent{})
 }
 
 func (self *Miner) Start(coinbase common.Address) {

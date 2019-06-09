@@ -67,46 +67,11 @@ type chainInsertFn func(types.Blocks) (int, error)
 // peerDropFn is a callback type for dropping a peer detected as malicious.
 type peerDropFn func(id ID)
 
-// announce is the hash notification of the availability of a new block in the
-// network.
-type announce struct {
-	hash   common.Hash   // Hash of the block being announced
-	number uint64        // Number of the block being announced (0 = unknown | old protocol)
-	header *types.Header // Header of the block partially reassembled (new protocol)
-	time   time.Time     // Timestamp of the announcement
-
-	origin ID // Identifier of the peer originating the notification
-
-	fetchHeader headerRequesterFn // Fetcher function to retrieve the header of an announced block
-	fetchBodies bodyRequesterFn   // Fetcher function to retrieve the body of an announced block
-}
-
-// headerFilterTask represents a batch of headers needing fetcher filtering.
-type headerFilterTask struct {
-	peer    string          // The source peer of block headers
-	headers []*types.Header // Collection of headers to filter
-	time    time.Time       // Arrival time of the headers
-}
-
-// bodyFilterTask represents a batch of block bodies (transactions and uncles)
-// needing fetcher filtering.
-type bodyFilterTask struct {
-	peer         string                 // The source peer of block bodies
-	transactions [][]*types.Transaction // Collection of transactions per block bodies
-	uncles       [][]*types.Header      // Collection of uncles per block bodies
-	time         time.Time              // Arrival time of the blocks' contents
-}
-
-// inject represents a schedules import operation.
-type inject struct {
-	origin string
-	block  *types.Block
-}
 
 // Fetcher is responsible for accumulating block announcements from various peers
 // and scheduling them for retrieval.
 type Fetcher struct {
-
+	name 		  string
 	// Callbacks
 	getBlock       blockRetrievalFn   // Retrieves a block from the local chain
 	verifyHeader   headerVerifierFn   // Checks if a block's headers have a valid proof of work
@@ -118,8 +83,9 @@ type Fetcher struct {
 }
 
 // New creates a block fetcher to retrieve blocks based on hash announcements.
-func New(getBlock blockRetrievalFn, verifyHeader headerVerifierFn, broadcastBlock blockBroadcasterFn, chainHeight chainHeightFn, insertChain chainInsertFn, dropPeer peerDropFn) *Fetcher {
+func New(name string, getBlock blockRetrievalFn, verifyHeader headerVerifierFn, broadcastBlock blockBroadcasterFn, chainHeight chainHeightFn, insertChain chainInsertFn, dropPeer peerDropFn) *Fetcher {
 	return &Fetcher{
+		name: 			name,
 		getBlock:       getBlock,
 		verifyHeader:   verifyHeader,
 		broadcastBlock: broadcastBlock,
@@ -148,7 +114,7 @@ func (f *Fetcher) insert(peer IPeer, block *types.Block) error {
 	//hash := block.Hash()
 
 	// Run the import on a new thread
-	f.log("Importing propagated block", "number", block.Number(), "from peer",peer.Name(), )
+	f.log("Importing propagated block", "number", block.Number(), "from peer",peer.Name(), "with", block.Transactions().Len(), "txs" )
 
 	// If the parent's unknown, abort insertion
 	parent := f.getBlock(block.ParentHash())
@@ -174,7 +140,7 @@ func (f *Fetcher) insert(peer IPeer, block *types.Block) error {
 	// Run the actual import and log any issues
 	if _, err := f.insertChain(types.Blocks{block}); err != nil {
 		//f.log("Propagated block import failed", "peer", peer.Name(), "number", block.Number(), "hash", hash, "err", err)
-		return errors.New(fmt.Sprintf("Propagated block import failed  number %d peer %s",block.Number(), peer.Name()))
+		return errors.New(fmt.Sprintf("Propagated block import failed  number %d peer %s with err %s",block.Number(), peer.Name(), err.Error()))
 	}
 	// If import succeeded, broadcast the block
 	f.broadcastBlock(block, false)
@@ -184,7 +150,7 @@ func (f *Fetcher) insert(peer IPeer, block *types.Block) error {
 
 func (f *Fetcher) log(a ...interface{})  {
 	if LogConfig.LogDownload {
-		Print("Fetcher", a)
+		Log("Fetcher", f.name, a)
 	}
 }
 

@@ -17,10 +17,10 @@
 package trie
 
 import (
-	"../../eth/common"
+	. "../../../config"
+	. "../../../util"
+	"../common"
 	"fmt"
-
-	"github.com/ethereum/go-ethereum/log"
 )
 
 // SecureTrie wraps a trie with key hashing. In a secure trie, all
@@ -67,7 +67,7 @@ func NewSecure(root common.Hash, db *Database) (*SecureTrie, error) {
 func (t *SecureTrie) Get(key []byte) []byte {
 	res, err := t.TryGet(key)
 	if err != nil {
-		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
+		t.log(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
 	return res
 }
@@ -87,7 +87,7 @@ func (t *SecureTrie) TryGet(key []byte) ([]byte, error) {
 // stored in the trie.
 func (t *SecureTrie) Update(key, value []byte) {
 	if err := t.TryUpdate(key, value); err != nil {
-		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
+		t.log(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
 }
 
@@ -112,7 +112,7 @@ func (t *SecureTrie) TryUpdate(key, value []byte) error {
 // Delete removes any existing value for key from the trie.
 func (t *SecureTrie) Delete(key []byte) {
 	if err := t.TryDelete(key); err != nil {
-		log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
+		t.log(fmt.Sprintf("Unhandled trie error: %v", err))
 	}
 }
 
@@ -142,11 +142,9 @@ func (t *SecureTrie) GetKey(shaKey []byte) []byte {
 func (t *SecureTrie) Commit(onleaf LeafCallback) (root common.Hash, err error) {
 	// Write all the pre-images to the actual disk database
 	if len(t.getSecKeyCache()) > 0 {
-		t.trie.db.lock.Lock()
 		for hk, key := range t.secKeyCache {
 			t.trie.db.insertPreimage(common.BytesToHash([]byte(hk)), key)
 		}
-		t.trie.db.lock.Unlock()
 
 		t.secKeyCache = make(map[string][]byte)
 	}
@@ -193,4 +191,10 @@ func (t *SecureTrie) getSecKeyCache() map[string][]byte {
 		t.secKeyCache = make(map[string][]byte)
 	}
 	return t.secKeyCache
+}
+
+func (t *SecureTrie) log(a ...interface{})  {
+	if LogConfig.LogDatabase {
+		Print("SecureTrie", a)
+	}
 }

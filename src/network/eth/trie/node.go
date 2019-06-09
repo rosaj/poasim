@@ -17,7 +17,7 @@
 package trie
 
 import (
-	"../../eth/common"
+	"../common"
 	"fmt"
 	"io"
 	"strings"

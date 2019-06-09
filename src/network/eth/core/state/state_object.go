@@ -17,11 +17,12 @@
 package state
 
 import (
-	. "../../../../util"
 	"../../common"
 	"bytes"
 	"fmt"
+	"io"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/metrics"
@@ -121,6 +122,10 @@ func newObject(db *StateDB, address common.Address, data Account) *stateObject {
 	}
 }
 
+// EncodeRLP implements rlp.Encoder.
+func (c *stateObject) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, c.data)
+}
 
 // setError remembers the first non-nil error it is called with.
 func (self *stateObject) setError(err error) {
@@ -134,7 +139,14 @@ func (self *stateObject) markSuicided() {
 }
 
 func (c *stateObject) touch() {
-	// update jurnal
+	c.db.journal.append(touchChange{
+		account: &c.address,
+	})
+	if c.address == ripemd {
+		// Explicitly put it in the dirty-cache, which is otherwise generated from
+		// flattened journals.
+		c.db.journal.dirty(c.address)
+	}
 }
 
 func (c *stateObject) getTrie(db Database) Trie {
@@ -169,7 +181,7 @@ func (self *stateObject) GetCommittedState(db Database, key common.Hash) common.
 	}
 	// Track the amount of time wasted on reading the storge trie
 	if metrics.EnabledExpensive {
-		defer func(start uint64) { self.db.StorageReads += TimeSince(start) }(SecondsNow())
+		defer func(start time.Time) { self.db.StorageReads += time.Since(start) }(time.Now())
 	}
 	// Otherwise load the value from the database
 	enc, err := self.getTrie(db).TryGet(key[:])
@@ -195,6 +207,12 @@ func (self *stateObject) SetState(db Database, key, value common.Hash) {
 	if prev == value {
 		return
 	}
+	// New value is different, update and journal the change
+	self.db.journal.append(storageChange{
+		account:  &self.address,
+		key:      key,
+		prevalue: prev,
+	})
 	self.setState(key, value)
 }
 
@@ -206,7 +224,7 @@ func (self *stateObject) setState(key, value common.Hash) {
 func (self *stateObject) updateTrie(db Database) Trie {
 	// Track the amount of time wasted on updating the storge trie
 	if metrics.EnabledExpensive {
-		defer func(start uint64) { self.db.StorageUpdates += TimeSince(start) }(SecondsNow())
+		defer func(start time.Time) { self.db.StorageUpdates += time.Since(start) }(time.Now())
 	}
 	// Update all the dirty slots in the trie
 	tr := self.getTrie(db)
@@ -236,12 +254,12 @@ func (self *stateObject) updateRoot(db Database) {
 
 	// Track the amount of time wasted on hashing the storge trie
 	if metrics.EnabledExpensive {
-		defer func(start uint64) { self.db.StorageHashes += TimeSince(start) }(SecondsNow())
+		defer func(start time.Time) { self.db.StorageHashes += time.Since(start) }(time.Now())
 	}
 	self.data.Root = self.trie.Hash()
 }
 
-// CommitTrie the storage trie of the object to ethdb.
+// CommitTrie the storage trie of the object to db.
 // This updates the trie root.
 func (self *stateObject) CommitTrie(db Database) error {
 	self.updateTrie(db)
@@ -250,7 +268,7 @@ func (self *stateObject) CommitTrie(db Database) error {
 	}
 	// Track the amount of time wasted on committing the storge trie
 	if metrics.EnabledExpensive {
-		defer func(start uint64) { self.db.StorageCommits += TimeSince(start) }(SecondsNow())
+		defer func(start time.Time) { self.db.StorageCommits += time.Since(start) }(time.Now())
 	}
 	root, err := self.trie.Commit(nil)
 	if err == nil {
@@ -284,6 +302,10 @@ func (c *stateObject) SubBalance(amount *big.Int) {
 }
 
 func (self *stateObject) SetBalance(amount *big.Int) {
+	self.db.journal.append(balanceChange{
+		account: &self.address,
+		prev:    new(big.Int).Set(self.data.Balance),
+	})
 	self.setBalance(amount)
 }
 
@@ -334,6 +356,12 @@ func (self *stateObject) Code(db Database) []byte {
 }
 
 func (self *stateObject) SetCode(codeHash common.Hash, code []byte) {
+	prevcode := self.Code(self.db.db)
+	self.db.journal.append(codeChange{
+		account:  &self.address,
+		prevhash: self.CodeHash(),
+		prevcode: prevcode,
+	})
 	self.setCode(codeHash, code)
 }
 
@@ -344,6 +372,10 @@ func (self *stateObject) setCode(codeHash common.Hash, code []byte) {
 }
 
 func (self *stateObject) SetNonce(nonce uint64) {
+	self.db.journal.append(nonceChange{
+		account: &self.address,
+		prev:    self.data.Nonce,
+	})
 	self.setNonce(nonce)
 }
 

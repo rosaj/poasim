@@ -20,9 +20,8 @@ import (
 	"../consensus"
 	"../core/state"
 	"../core/types"
+	"../params"
 	"fmt"
-
-	"github.com/ethereum/go-ethereum/params"
 )
 
 // BlockValidator is responsible for validating block headers, uncles and

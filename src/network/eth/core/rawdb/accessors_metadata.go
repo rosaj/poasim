@@ -19,10 +19,10 @@ package rawdb
 import (
 	"../../common"
 	"../../ethdb"
+	"../../params"
 	"encoding/json"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 

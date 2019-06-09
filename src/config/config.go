@@ -3,6 +3,7 @@ package config
 import (
 	"github.com/agoussia/godes"
 	"math"
+	"math/big"
 	"time"
 )
 
@@ -81,6 +82,8 @@ type logConfig struct {
 	LogTxPool bool
 
 	LogDownload bool
+
+	LogDatabase bool
 }
 
 type metricConfig struct {
@@ -90,72 +93,45 @@ type metricConfig struct {
 
 }
 
+type EthereumConfig struct {
+	ChainConfig *chainConfig
+	// Mining options
+	MinerConfig *minerConfig
 
-var SimConfig = config {
+	// Transaction pool options
+	TxPoolConfig *txPoolConfig
+}
 
-	SimulationTime: (1 * 10 * time.Minute).Seconds(),
-
-	NodeCount: 6,
-
-	NodeStabilisationTime:  5 * time.Minute.Seconds(),
-
-	ChurnEnabled: false,
-
-	NodeArrivalDistr: NewNormalDistr((2*time.Second.Seconds()), 0),
-
-	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Hour).Seconds())),
-
-	NodeIntersessionTimeDistr: NewExpDistr( 1 / (1 * time.Minute).Seconds()),
-
-	NodeLifetimeDistr: NewExpDistr(1 / (111115 * time.Hour.Seconds())),
-
-	NetworkLatency:  NewLogNormalDistr(.209,.157),// u metodi NextNetworkLatency dodano /10
-
-	MaxPeers: 25,
-
-	MinerCount: 6,
-
-	BlockTime: 15,
-
-	TransactionIntervalDistr: NewExpDistr(0.2),
+type chainConfig struct {
+	Clique *CliqueConfig
 
 }
 
-var LogConfig = logConfig {
-
-	Logging: true,
-
-	LogMessages: false,
-
-	LogDialing: false,
-
-	LogNode: false,
-
-	LogPeer: false,
-
-	LogDiscovery: false,
-
-	LogServer: false,
-
-	LogEthServer: false,
-
-	LogWorker: true,
-
-	LogConsensus: false,
-
-	LogProtocol: false,
-
-	LogBlockchain: true,
-
-	LogTxPool: true,
-
-	LogDownload: false,
+// CliqueConfig is the consensus engine configs for proof-of-authority based sealing.
+type CliqueConfig struct {
+	Period uint64 // Number of seconds between blocks to enforce
+	Epoch  uint64 // Epoch length to reset votes and checkpoint
 }
 
-var MetricConfig  = metricConfig {
 
-	GroupFactor: 60,
 
+type txPoolConfig struct {
+	PriceLimit uint64 // Minimum gas price to enforce for acceptance into the pool
+	PriceBump  uint64 // Minimum price bump percentage to replace an already existing transaction (nonce)
+
+	AccountSlots uint64 // Number of executable transaction slots guaranteed per account
+	GlobalSlots  uint64 // Maximum number of executable transaction slots for all accounts
+	AccountQueue uint64 // Maximum number of non-executable transaction slots permitted per account
+	GlobalQueue  uint64 // Maximum number of non-executable transaction slots for all accounts
+
+	Lifetime time.Duration // Maximum amount of time non-executable transaction are queued
+}
+
+type minerConfig struct {
+	GasFloor  uint64         // Target gas floor for mined blocks.
+	GasCeil   uint64         // Target gas ceiling for mined blocks.
+	GasPrice  *big.Int       // Minimum gas price for mining a transaction
+	Recommit  time.Duration  // The time interval for miner to re-create mining work.
 }
 
 func (config *config) NextTrInterval() (interval float64) {

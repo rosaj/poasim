@@ -18,11 +18,12 @@
 package core
 
 import (
-	. "../../../config"
+	"../../../config"
 	. "../../../util"
 	"../../eth/common"
 	"../../eth/common/prque"
 	"../../eth/ethdb"
+	"../../eth/params"
 	"../consensus"
 	"../core/rawdb"
 	"../core/state"
@@ -39,32 +40,12 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/metrics"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/hashicorp/golang-lru"
 )
 
 var (
-	accountReadTimer   = metrics.NewRegisteredTimer("chain/account/reads", nil)
-	accountHashTimer   = metrics.NewRegisteredTimer("chain/account/hashes", nil)
-	accountUpdateTimer = metrics.NewRegisteredTimer("chain/account/updates", nil)
-	accountCommitTimer = metrics.NewRegisteredTimer("chain/account/commits", nil)
-
-	storageReadTimer   = metrics.NewRegisteredTimer("chain/storage/reads", nil)
-	storageHashTimer   = metrics.NewRegisteredTimer("chain/storage/hashes", nil)
-	storageUpdateTimer = metrics.NewRegisteredTimer("chain/storage/updates", nil)
-	storageCommitTimer = metrics.NewRegisteredTimer("chain/storage/commits", nil)
-
-	blockInsertTimer     = metrics.NewRegisteredTimer("chain/inserts", nil)
-	blockValidationTimer = metrics.NewRegisteredTimer("chain/validation", nil)
-	blockExecutionTimer  = metrics.NewRegisteredTimer("chain/execution", nil)
-	blockWriteTimer      = metrics.NewRegisteredTimer("chain/write", nil)
-
-	blockPrefetchExecuteTimer   = metrics.NewRegisteredTimer("chain/prefetch/executes", nil)
-	blockPrefetchInterruptMeter = metrics.NewRegisteredMeter("chain/prefetch/interrupts", nil)
-
 	ErrNoGenesis = errors.New("Genesis not found in chain")
 )
 
@@ -161,6 +142,7 @@ type BlockChain struct {
 
 	badBlocks      *lru.Cache              // Bad block cache
 	shouldPreserve func(*types.Block) bool // Function used to determine whether should preserve the given block.
+
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -395,6 +377,7 @@ func (bc *BlockChain) State() (*state.StateDB, error) {
 
 // StateAt returns a new mutable state based on a particular point in time.
 func (bc *BlockChain) StateAt(root common.Hash) (*state.StateDB, error) {
+	//Print("Blockchain Stateat", bc.name, fmt.Sprintf("%x", root))
 	return state.New(root, bc.stateCache)
 }
 
@@ -416,8 +399,6 @@ func (bc *BlockChain) ResetWithGenesisBlock(genesis *types.Block) error {
 		return err
 	}
 	
-	
-
 	// Prepare the genesis block and reinitialise the chain
 	if err := bc.hc.WriteTd(genesis.Hash(), genesis.NumberU64(), genesis.Difficulty()); err != nil {
 		bc.log("CRITICAL: Failed to write genesis block TD", "err", err)
@@ -690,8 +671,10 @@ func (bc *BlockChain) Stop() {
 		return
 	}
 	// Unsubscribe all subscriptions registered from blockchain
-	bc.scope.Close()
-	godes.Interrupt(bc)
+	//bc.scope.Close()
+	if bc.IsShedulled() {
+		godes.Interrupt(bc)
+	}
 
 	atomic.StoreInt32(&bc.procInterrupt, 1)
 
@@ -724,6 +707,19 @@ func (bc *BlockChain) Stop() {
 	}
 	*/
 	bc.log("Blockchain manager stopped")
+}
+
+func (bc *BlockChain) Start()  {
+	if !atomic.CompareAndSwapInt32(&bc.running, 1, 0) {
+		return
+	}
+
+	atomic.StoreInt32(&bc.procInterrupt, 0)
+
+	if bc.IsShedulled() {
+		godes.Resume(bc, 0)
+	}
+
 }
 
 func (bc *BlockChain) procFutureBlocks() {
@@ -903,9 +899,12 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	rawdb.WriteBlock(bc.db, block)
 
 	root, err := state.Commit(true)
+	//Print("Blockchain commit", bc.name, fmt.Sprintf("%x", root), "err", err)
+
 	if err != nil {
 		return NonStatTy, err
 	}
+
 	triedb := bc.stateCache.TrieDB()
 
 	// If we're running an archive node, always flush
@@ -949,6 +948,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 					bc.gcproc = 0
 				}
 			}
+
 			// Garbage collect anything below our required write retention
 			for !bc.triegc.Empty() {
 				root, number := bc.triegc.Pop()
@@ -958,6 +958,8 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 				}
 				triedb.Dereference(root.(common.Hash))
 			}
+
+
 		}
 	}
 
@@ -1056,6 +1058,10 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 	}
 	// Pre-checks passed, start the full block imports
 	n, events, logs, err := bc.insertChain(chain, true)
+
+	if err != nil {
+		bc.log("Blockchain", bc.name, "Insert err", err)
+	}
 
 	bc.PostChainEvents(events, logs)
 	return n, err
@@ -1171,12 +1177,11 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 
 			//	blockPrefetchExecuteTimer.Update(time.Since(start))
 				if atomic.LoadUint32(&followupInterrupt) == 1 {
-					blockPrefetchInterruptMeter.Mark(1)
+				//	blockPrefetchInterruptMeter.Mark(1)
 				}
 			}
 		}
 		// Process block using the parent state as reference point
-		substart := SecondsNow()
 		receipts, logs, usedGas, err := bc.processor.Process(block, statedb)
 		if err != nil {
 			bc.log("Processing/ApplyTransaction failed with err", err)
@@ -1186,19 +1191,9 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 		}
 		bc.log("Process/ApplyTransaction gasUsed", usedGas, "receipt", receipts)
 		// Update the metrics touched during block processing
-		accountReadTimer.Update(statedb.AccountReads)     // Account reads are complete, we can mark them
-		storageReadTimer.Update(statedb.StorageReads)     // Storage reads are complete, we can mark them
-		accountUpdateTimer.Update(statedb.AccountUpdates) // Account updates are complete, we can mark them
-		storageUpdateTimer.Update(statedb.StorageUpdates) // Storage updates are complete, we can mark them
 
-		triehash := statedb.AccountHashes + statedb.StorageHashes // Save to not double count in validation
-		trieproc := statedb.AccountReads + statedb.AccountUpdates
-		trieproc += statedb.StorageReads + statedb.StorageUpdates
-
-		blockExecutionTimer.Update(TimeSince(substart) - trieproc - triehash)
 
 		// Validate the state using the default validator
-		substart = SecondsNow()
 		if err := bc.validator.ValidateState(block, statedb, receipts, usedGas); err != nil {
 			bc.reportBlock(block, receipts, err)
 			atomic.StoreUint32(&followupInterrupt, 1)
@@ -1206,27 +1201,13 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 		}
 		proctime := TimeSince(start)
 
-		// Update the metrics touched during block validation
-		accountHashTimer.Update(statedb.AccountHashes) // Account hashes are complete, we can mark them
-		storageHashTimer.Update(statedb.StorageHashes) // Storage hashes are complete, we can mark them
-
-		blockValidationTimer.Update(TimeSince(substart)- (statedb.AccountHashes + statedb.StorageHashes - triehash))
-
 		// Write the block to the chain and get the status.
-		substart = SecondsNow()
 		status, err := bc.writeBlockWithState(block, receipts, statedb)
 		if err != nil {
 			atomic.StoreUint32(&followupInterrupt, 1)
 			return it.index, events, coalescedLogs, err
 		}
 		atomic.StoreUint32(&followupInterrupt, 1)
-
-		// Update the metrics touched during block commit
-		accountCommitTimer.Update(statedb.AccountCommits) // Account commits are complete, we can mark them
-		storageCommitTimer.Update(statedb.StorageCommits) // Storage commits are complete, we can mark them
-
-		blockWriteTimer.Update(TimeSince(substart) - statedb.AccountCommits - statedb.StorageCommits)
-		//blockInsertTimer.UpdateSince(start)
 
 		switch status {
 		case CanonStatTy:
@@ -1694,6 +1675,7 @@ func (bc *BlockChain) SubscribeChainEvent(ch chan<- ChainEvent) event.Subscripti
 }
 func (bc *BlockChain) SubscribeChainHeadEvent(headListener func(ch ChainHeadEvent)) {
 	bc.chainHeadFeed = append(bc.chainHeadFeed, headListener)
+	//bc.chainHeadFeed = append([]func(ch ChainHeadEvent){headListener}, bc.chainHeadFeed...)
 }
 func (bc *BlockChain) feedChainHeadEvent(ch ChainHeadEvent)  {
 	for _, feed := range bc.chainHeadFeed {
@@ -1729,7 +1711,7 @@ func (bc *BlockChain) SubscribeBlockProcessingEvent(ch chan<- bool) event.Subscr
 }
 
 func (bc *BlockChain) log(a ...interface{})  {
-	if LogConfig.LogBlockchain {
-		Print("Blockchain",bc.name, a)
+	if config.LogConfig.LogBlockchain {
+		Log("Blockchain",bc.name, a)
 	}
 }

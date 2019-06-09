@@ -1,6 +1,7 @@
 package downloader
 
 import (
+	"../params"
 	. "../../../common"
 	. "../../../config"
 	. "../../../util"
@@ -9,7 +10,6 @@ import (
 	. "../event_feed"
 	"errors"
 	"github.com/agoussia/godes"
-	"github.com/ethereum/go-ethereum/params"
 	"math/big"
 	"sync/atomic"
 	"time"

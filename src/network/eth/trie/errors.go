@@ -17,8 +17,9 @@
 package trie
 
 import (
-	"../../eth/common"
+	"../common"
 	"fmt"
+
 )
 
 // MissingNodeError is returned by the trie functions (TryGet, TryUpdate, TryDelete)

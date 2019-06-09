@@ -25,7 +25,7 @@ import (
 	"../core"
 	"../core/state"
 	"../core/types"
-	"bytes"
+	"../params"
 	"errors"
 	"github.com/agoussia/godes"
 	mapset "github.com/deckarep/golang-set"
@@ -33,7 +33,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/params"
 )
 
 const (
@@ -331,11 +330,12 @@ func (w *worker) startWork()  {
 
 
 func (w *worker) handleChainHeadEvent(head core.ChainHeadEvent)  {
+	w.log("handleChainHeadEvent", head.Block.NumberU64())
+
 	w.clearPending(head.Block.NumberU64())
 	w.timestamp = int64(SecondsNow())
 	w.commitWork(false, commitInterruptNewHead)
 
-	w.log("handleChainHeadEvent", head.Block.NumberU64())
 }
 
 func (w *worker) resubmitAdjust(adjust *intervalAdjust)  {
@@ -368,6 +368,7 @@ func (w *worker) newWorkLoop() {
 	godes.AddRunner(w)
 }
 
+// ako se worker zaustavi, run i dalje radi ali uzaludno
 func (w *worker) Run()  {
 
 	for {
@@ -465,7 +466,11 @@ func (w *worker) handleTxEvent(ev core.NewTxsEvent)  {
 
 
 func (w *worker) feedNewWorkReq(req *newWorkReq)  {
-	w.commitNewWork(req.interrupt, req.noempty, req.timestamp)
+	if w.isRunning() {
+		StartNewRunner(func() {
+			w.commitNewWork(req.interrupt, req.noempty, req.timestamp)
+		})
+	}
 }
 
 func (w *worker) postTask(task *task)  {
@@ -479,6 +484,7 @@ func (task *task) Run()  {
 	// Reject duplicate sealing work due to resubmitting.
 	sealHash := w.engine.SealHash(task.block.Header())
 	if sealHash == w.prev {
+		w.log("Resubmiting task for block", task.block.NumberU64())
 		return
 	}
 	// Interrupt previous sealing operation
@@ -659,6 +665,8 @@ func (w *worker) updateSnapshot() {
 }
 
 func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
+	w.log("commitTransaction with nonce", tx.Nonce(), "hash", tx.Hash())
+
 	snap := w.current.state.Snapshot()
 
 	receipt, gas, err := core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed)
@@ -667,11 +675,11 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
 	}
-	w.log("Apply transactin gasUsed", gas, "receipt", receipt)
+	w.log("Apply transaction gasUsed", gas, "receipt", receipt)
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
 
-	w.log("commitTransaction", tx)
+	//w.log("commitTransaction", tx)
 	return receipt.Logs, nil
 }
 
@@ -684,6 +692,8 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
 	}
+
+	w.log("commitTransactions", txs)
 
 	var coalescedLogs []*types.Log
 
@@ -718,6 +728,11 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 		if tx == nil {
 			break
 		}
+
+
+		w.log("commitTransactions processing tx with nonce", tx.Nonce())
+
+
 		// Error may be ignored here. The error has already been checked
 		// during transaction acceptance is the transaction pool.
 		//
@@ -728,6 +743,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 		w.current.state.Prepare(tx.Hash(), common.Hash{}, w.current.tcount)
 
 		logs, err := w.commitTransaction(tx, coinbase)
+		//Print(w.current.header.Number, "Balance", w.current.state.GetBalance(from), w.current.state.GetBalance(*tx.To()))
 		switch err {
 		case core.ErrGasLimitReached:
 			// Pop the current out-of-gas transaction without shifting in the next from the account
@@ -779,7 +795,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 		w.resubmitAdjust(&intervalAdjust{inc: false})
 	}
 
-	w.log("commitTransactions", txs)
+	//w.log("commitTransactions", txs)
 	return false
 }
 
@@ -808,6 +824,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		Extra:      w.extra,
 		Time:       uint64(timestamp),
 	}
+	//Print("GasLimit", header.GasLimit)
 	// Only set the coinbase if our consensus engine is running (avoid spurious block rewards)
 	if w.isRunning() {
 		if w.coinbase == (common.Address{}) {
@@ -820,19 +837,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		w.log("Failed to prepare header for mining", "err", err)
 		return
 	}
-	// If we are care about TheDAO hard-fork check whether to override the extra-data or not
-	if daoBlock := w.chainConfig.DAOForkBlock; daoBlock != nil {
-		// Check whether the block is among the fork extra-override range
-		limit := new(big.Int).Add(daoBlock, params.DAOForkExtraRange)
-		if header.Number.Cmp(daoBlock) >= 0 && header.Number.Cmp(limit) < 0 {
-			// Depending whether we support or oppose the fork, override differently
-			if w.chainConfig.DAOForkSupport {
-				header.Extra = common.CopyBytes(params.DAOForkBlockExtra)
-			} else if bytes.Equal(header.Extra, params.DAOForkBlockExtra) {
-				header.Extra = []byte{} // If miner opposes, don't let it use the reserved extra-data
-			}
-		}
-	}
+
 	// Could potentially happen if starting to mine in an odd state.
 	err := w.makeCurrent(parent, header)
 	if err != nil {
@@ -855,7 +860,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 				break
 			}
 			if err := w.commitUncle(env, uncle.Header()); err != nil {
-				w.log("Possible uncle rejected", "hash", hash, "reason", err)
+				w.log("Possible uncle rejected",uncle.NumberU64(),  "hash", hash, "reason", err)
 			} else {
 				w.log("Committing new uncle to block", "hash", hash)
 				uncles = append(uncles, uncle.Header())
@@ -874,6 +879,9 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 
 	// Fill the block with all available pending transactions.
 	pending := w.eth.TxPool().Pending()
+	//Print("worker", w.name, "Block", env.header.Number, "Pending txs", len(pending))
+
+	w.log("Pending txs to be included in block", len(pending))
 
 	// Short circuit if there is no available pending transactions
 	if len(pending) == 0 {
@@ -902,7 +910,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	}
 	w.commit(uncles, true, tstart)
 
-	w.log("commited new work")
+	w.log("commited new work with", len(pending), "pending txs")
 }
 
 // commit runs any post-transaction state modifications, assembles the final block
@@ -919,8 +927,8 @@ func (w *worker)  commit(uncles []*types.Header,  update bool, start uint64) err
 	if err != nil {
 		return err
 	}
-	if w.isRunning() {
-		// TODO: if exited return else do the task
+
+	if w.isRunning() && !(block.Transactions().Len() == 0 && 0 < w.eth.TxPool().PendingCount()) {
 
 		t := &task{Runner: &godes.Runner{},worker: w, receipts: receipts, state: s, block: block, createdAt: SecondsNow()}
 		w.postTask(t)

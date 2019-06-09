@@ -15,19 +15,15 @@ func Log(a ...interface{}){
 	}
 	Print(a)
 }
+func LogError(err error) {
+	Print(err)
+}
 
 func Print(a ...interface{})  {
 	fmt.Println(ToDuration(godes.GetSystemTime()), a)
 }
 
 func ToDuration(seconds float64)  time.Duration {
-
-	/*
-	t := time.Now()
-	t1 := t.Add(time.Second * time.Duration(seconds))
-	dif := t1.Sub(t)
-	 */
-
 	return time.Duration(seconds) * time.Second
 }
 
@@ -43,6 +39,17 @@ func SecondsNow() uint64 {
 	return uint64(godes.GetSystemTime())
 }
 
-func LogError(err error) {
-	Print(err)
+func StartNewRunner(runFn func()) godes.Runner {
+	runner := &tempRunner{&godes.Runner{}, runFn}
+	godes.AddRunner(runner)
+	return *runner.Runner
+}
+
+type tempRunner struct {
+	*godes.Runner
+	runFn func()
+}
+
+func (t *tempRunner) Run()  {
+	t.runFn()
 }

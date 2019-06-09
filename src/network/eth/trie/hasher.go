@@ -17,7 +17,7 @@
 package trie
 
 import (
-	"../../eth/common"
+	"../common"
 	"hash"
 	"sync"
 
@@ -183,9 +183,7 @@ func (h *hasher) store(n node, db *Database, force bool) (node, error) {
 		// We are pooling the trie nodes into an intermediate memory cache
 		hash := common.BytesToHash(hash)
 
-		db.lock.Lock()
 		db.insert(hash, h.tmp, n)
-		db.lock.Unlock()
 
 		// Track external references from account->storage trie
 		if h.onleaf != nil {

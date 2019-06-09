@@ -28,6 +28,7 @@ type account struct {
 
 type ManagedState struct {
 	*StateDB
+
 	accounts map[common.Address]*account
 }
 
@@ -72,6 +73,8 @@ func (ms *ManagedState) NewNonce(addr common.Address) uint64 {
 }
 
 // GetNonce returns the canonical nonce for the managed or unmanaged account.
+//
+// Because GetNonce mutates the DB, we must take a write lock.
 func (ms *ManagedState) GetNonce(addr common.Address) uint64 {
 
 	if ms.hasAccount(addr) {
@@ -84,7 +87,7 @@ func (ms *ManagedState) GetNonce(addr common.Address) uint64 {
 
 // SetNonce sets the new canonical nonce for the managed state
 func (ms *ManagedState) SetNonce(addr common.Address, nonce uint64) {
-	
+
 	so := ms.GetOrNewStateObject(addr)
 	so.SetNonce(nonce)
 
@@ -103,7 +106,6 @@ func (ms *ManagedState) hasAccount(addr common.Address) bool {
 
 // populate the managed state
 func (ms *ManagedState) getAccount(addr common.Address) *account {
-
 	if account, ok := ms.accounts[addr]; !ok {
 		so := ms.GetOrNewStateObject(addr)
 		ms.accounts[addr] = newAccount(so)

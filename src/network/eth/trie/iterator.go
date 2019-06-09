@@ -17,7 +17,7 @@
 package trie
 
 import (
-	"../../eth/common"
+	"../common"
 	"bytes"
 	"container/heap"
 	"errors"

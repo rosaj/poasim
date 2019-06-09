@@ -17,12 +17,11 @@
 package miner
 
 import (
+	. "../../../config"
+	. "../../../util"
 	"../common"
 	"../core/types"
 	"container/ring"
-	"sync"
-
-	"github.com/ethereum/go-ethereum/log"
 )
 
 // chainRetriever is used by the unconfirmed block set to verify whether a previously
@@ -50,7 +49,6 @@ type unconfirmedBlocks struct {
 	chain  chainRetriever // Blockchain to verify canonical status through
 	depth  uint           // Depth after which to discard previous blocks
 	blocks *ring.Ring     // Block infos to allow canonical chain cross checks
-	lock   sync.RWMutex   // Protects the fields from concurrent access
 }
 
 // newUnconfirmedBlocks returns new data structure to track currently unconfirmed blocks.
@@ -73,24 +71,19 @@ func (set *unconfirmedBlocks) Insert(index uint64, hash common.Hash) {
 		hash:  hash,
 	}
 	// Set as the initial ring or append to the end
-	set.lock.Lock()
-	defer set.lock.Unlock()
-
 	if set.blocks == nil {
 		set.blocks = item
 	} else {
 		set.blocks.Move(-1).Link(item)
 	}
 	// Display a log for the user to notify of a new mined block unconfirmed
-	log.Info("🔨 mined potential block", "number", index, "hash", hash)
+	set.log("🔨 mined potential block", "number", index, "hash", hash)
 }
 
 // Shift drops all unconfirmed blocks from the set which exceed the unconfirmed sets depth
 // allowance, checking them against the canonical chain for inclusion or staleness
 // report.
 func (set *unconfirmedBlocks) Shift(height uint64) {
-	set.lock.Lock()
-	defer set.lock.Unlock()
 
 	for set.blocks != nil {
 		// Retrieve the next unconfirmed block and abort if too fresh
@@ -102,9 +95,9 @@ func (set *unconfirmedBlocks) Shift(height uint64) {
 		header := set.chain.GetHeaderByNumber(next.index)
 		switch {
 		case header == nil:
-			log.Warn("Failed to retrieve header of mined block", "number", next.index, "hash", next.hash)
+			set.log("Failed to retrieve header of mined block", "number", next.index, "hash", next.hash)
 		case header.Hash() == next.hash:
-			log.Info("🔗 block reached canonical chain", "number", next.index, "hash", next.hash)
+			set.log("🔗 block reached canonical chain", "number", next.index, "hash", next.hash)
 		default:
 			// Block is not canonical, check whether we have an uncle or a lost block
 			included := false
@@ -119,9 +112,9 @@ func (set *unconfirmedBlocks) Shift(height uint64) {
 				}
 			}
 			if included {
-				log.Info("⑂ block became an uncle", "number", next.index, "hash", next.hash)
+				set.log("⑂ block became an uncle", "number", next.index, "hash", next.hash)
 			} else {
-				log.Info("😱 block lost", "number", next.index, "hash", next.hash)
+				set.log("😱 block lost", "number", next.index, "hash", next.hash)
 			}
 		}
 		// Drop the block out of the ring
@@ -132,5 +125,11 @@ func (set *unconfirmedBlocks) Shift(height uint64) {
 			set.blocks.Unlink(1)
 			set.blocks = set.blocks.Move(1)
 		}
+	}
+}
+
+func (set *unconfirmedBlocks) log(a ...interface{})  {
+	if LogConfig.LogBlockchain {
+		Log("Unconfirmed", a)
 	}
 }

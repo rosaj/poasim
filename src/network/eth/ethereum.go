@@ -31,19 +31,13 @@ import (
 	"../eth/ethdb"
 	. "../eth/event_feed"
 	"../eth/miner"
-	"errors"
+	"../eth/params"
 	"fmt"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/crypto"
 	"math/big"
-	"runtime"
 	"sync/atomic"
-
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/eth/downloader"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rlp"
+	"time"
 )
 
 // Ethereum implements the Ethereum full node service.
@@ -51,9 +45,6 @@ type Ethereum struct {
 	*devp2p.Server
 
 	config *Config
-
-	// Channel for shutting down the service
-	shutdownChan chan bool // Channel for shutting down the Ethereum
 
 	// Handlers
 	txPool          *core.TxPool
@@ -72,46 +63,89 @@ type Ethereum struct {
 
 }
 
-// New creates a new Ethereum object (including the
-// initialisation of the common Ethereum object)
-func New(node INode, config *Config) (*Ethereum, error) {
+func resolveConfig(nodeConfig *EthereumConfig) *Config {
 
-	if config == nil {
+
+	var config *Config
+	if nodeConfig == nil {
 		config = &DefaultConfig
+	} else {
+		var minerConfig miner.Config
+		if nodeConfig.MinerConfig == nil {
+			minerConfig = DefaultConfig.Miner
+		} else {
+			minerConfig = miner.Config {
+				GasFloor:	nodeConfig.MinerConfig.GasFloor,
+				GasCeil:	nodeConfig.MinerConfig.GasCeil,
+				GasPrice:	nodeConfig.MinerConfig.GasPrice,
+				Recommit:	nodeConfig.MinerConfig.Recommit,
+			}
+		}
+
+		var txPoolConfig core.TxPoolConfig
+		if nodeConfig.TxPoolConfig == nil {
+			txPoolConfig = DefaultConfig.TxPool
+		} else {
+			txPoolConfig = core.TxPoolConfig {
+				Rejournal:		time.Hour,
+
+				PriceLimit:		nodeConfig.TxPoolConfig.PriceLimit,
+				PriceBump:		nodeConfig.TxPoolConfig.PriceBump,
+
+				AccountSlots:	nodeConfig.TxPoolConfig.AccountSlots,
+				GlobalSlots:	nodeConfig.TxPoolConfig.GlobalSlots,
+				AccountQueue:	nodeConfig.TxPoolConfig.AccountQueue,
+				GlobalQueue:	nodeConfig.TxPoolConfig.GlobalQueue,
+
+				Lifetime:		nodeConfig.TxPoolConfig.Lifetime,
+			}
+		}
+
+		config = &Config {
+			DatabaseCache:  512,
+			TrieCleanCache: 256,
+			TrieDirtyCache: 256,
+			TrieTimeout:    60 * time.Minute,
+			Miner: 			minerConfig,
+			TxPool: 		txPoolConfig,
+		}
+
 	}
 
-	// Ensure configuration values are compatible and sane
-	if config.SyncMode == downloader.LightSync {
-		return nil, errors.New("can't run eth.Ethereum in light sync mode, use les.LightEthereum")
-	}
-	if !config.SyncMode.IsValid() {
-		return nil, fmt.Errorf("invalid sync mode %d", config.SyncMode)
-	}
+
 	if config.Miner.GasPrice == nil || config.Miner.GasPrice.Cmp(big.NewInt(0)) <= 0 {
-	//	log.Warn("Sanitizing invalid miner gas price", "provided", config.Miner.GasPrice, "updated", DefaultConfig.Miner.GasPrice)
+		//	log.Warn("Sanitizing invalid miner gas price", "provided", config.Miner.GasPrice, "updated", DefaultConfig.Miner.GasPrice)
 		config.Miner.GasPrice = new(big.Int).Set(DefaultConfig.Miner.GasPrice)
 	}
 	if config.NoPruning && config.TrieDirtyCache > 0 {
 		config.TrieCleanCache += config.TrieDirtyCache
 		config.TrieDirtyCache = 0
 	}
+
+	return config
+}
+
+// New creates a new Ethereum object (including the
+// initialisation of the common Ethereum object)
+func New(node INode) (*Ethereum, error) {
+	config := resolveConfig(node.GetConfig())
+
 //	log.Info("Allocated trie memory caches", "clean", common.StorageSize(config.TrieCleanCache)*1024*1024, "dirty", common.StorageSize(config.TrieDirtyCache)*1024*1024)
 
 	// Assemble the Ethereum object
 	chainDb := rawdb.NewMemoryDatabase()
 
-	chainConfig, _, genesisErr := core.SetupGenesisBlockWithOverride(chainDb, config.Genesis)
-	if _, ok := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !ok {
-		return nil, genesisErr
-	}
+	chainConfig, _, _ := core.SetupGenesisBlockWithOverride(chainDb, node.GetConfig())
+
+	chainConfig.ChainID = big.NewInt(int64(node.GetNetworkID()))
+
 	//log.Info("Initialised chain configuration", "config", chainConfig)
 
-	eth := &Ethereum{
+	eth := &Ethereum {
 		Server:			devp2p.NewServer(node),
 		config:         config,
 		chainDb:        chainDb,
 		engine:         CreateConsensusEngine(node.Name(), chainConfig, chainDb),
-		shutdownChan:   make(chan bool),
 		gasPrice:       config.Miner.GasPrice,
 		etherbase:      config.Miner.Etherbase,
 		eventFeed:		NewEventFeed(),
@@ -142,28 +176,9 @@ func New(node INode, config *Config) (*Ethereum, error) {
 	eth.Server.Protocols = eth.Protocols()
 
 	eth.miner = miner.New(node.Name() ,eth, &config.Miner, chainConfig, eth.EventFeed(), eth.engine, eth.isLocalBlock)
-	eth.miner.SetExtra(makeExtraData(config.Miner.ExtraData))
-
 	eth.StartMining()
 
 	return eth, nil
-}
-
-func makeExtraData(extra []byte) []byte {
-	if len(extra) == 0 {
-		// create default extradata
-		extra, _ = rlp.EncodeToBytes([]interface{}{
-			uint(params.VersionMajor<<16 | params.VersionMinor<<8 | params.VersionPatch),
-			"geth",
-			runtime.Version(),
-			runtime.GOOS,
-		})
-	}
-	if uint64(len(extra)) > params.MaximumExtraDataSize {
-		log.Warn("Miner extra data exceed limit", "extra", hexutil.Bytes(extra), "limit", params.MaximumExtraDataSize)
-		extra = nil
-	}
-	return extra
 }
 
 // CreateConsensusEngine creates the required type of consensus engine instance for an Ethereum service
@@ -266,7 +281,7 @@ func (s *Ethereum) SetEtherbase(etherbase common.Address) {
 // and updates the minimum price required by the transaction pool.
 func (s *Ethereum) StartMining() error {
 	// If the miner was not running, initialize it
-	if !s.IsMining() {
+	if !s.IsMining(){
 		// Propagate the initial price point to the transaction pool
 		price := s.gasPrice
 		s.txPool.SetGasPrice(price)
@@ -290,14 +305,17 @@ func (s *Ethereum) StartMining() error {
 		atomic.StoreUint32(&s.protocolManager.acceptTxs, 1)
 
 		s.miner.SetEtherbase(eb)
-	//	if s.Self().Name() == "2" {
+
+		if initialStart < 2 {
+			initialStart += 1
 			s.miner.Start(eb)
-//		}
+		}
 	}
 
 	s.log("Starting to mine")
 	return nil
 }
+var initialStart = 0
 
 // StopMining terminates the miner, both at the consensus engine level as well as
 // at the block creation level.
@@ -344,6 +362,11 @@ func (s *Ethereum) Start() {
 
 	// Start the networking layer and the light server if requested
 	s.protocolManager.Start()
+
+	s.eventFeed.Start()
+	s.blockchain.Start()
+	s.txPool.Start()
+
 }
 
 // Stop implements node.Service, terminating all internal goroutines used by the
@@ -352,16 +375,13 @@ func (s *Ethereum) Stop() {
 	s.Server.Stop()
 
 	s.blockchain.Stop()
-	s.engine.Close()
 	s.protocolManager.Stop()
 
 	s.txPool.Stop()
 	s.miner.Stop()
 
-//	s.eventMux.Stop()
+	s.eventFeed.Stop()
 
-//	s.chainDb.Close()
-	close(s.shutdownChan)
 }
 
 func (s *Ethereum) log(a ...interface{})  {

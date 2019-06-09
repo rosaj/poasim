@@ -439,6 +439,9 @@ func (p *peer) RequestReceipts(hashes []common.Hash) error {
 
 func (p *peer) nodesEthPeer() *peer {
 	iPeer :=  p.Node().Server().GetProtocolManager().FindPeer(p.Self())
+	if iPeer == nil {
+		return nil
+	}
 	return iPeer.(*peer)
 }
 

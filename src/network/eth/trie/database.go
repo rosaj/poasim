@@ -17,40 +17,19 @@
 package trie
 
 import (
+	. "../../../config"
 	. "../../../util"
-	"../../eth/common"
+	"../common"
 	"../ethdb"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"reflect"
-	"sync"
 	"time"
 
 	"github.com/allegro/bigcache"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
-)
-
-var (
-	memcacheCleanHitMeter   = metrics.NewRegisteredMeter("trie/memcache/clean/hit", nil)
-	memcacheCleanMissMeter  = metrics.NewRegisteredMeter("trie/memcache/clean/miss", nil)
-	memcacheCleanReadMeter  = metrics.NewRegisteredMeter("trie/memcache/clean/read", nil)
-	memcacheCleanWriteMeter = metrics.NewRegisteredMeter("trie/memcache/clean/write", nil)
-
-	memcacheFlushTimeTimer  = metrics.NewRegisteredResettingTimer("trie/memcache/flush/time", nil)
-	memcacheFlushNodesMeter = metrics.NewRegisteredMeter("trie/memcache/flush/nodes", nil)
-	memcacheFlushSizeMeter  = metrics.NewRegisteredMeter("trie/memcache/flush/size", nil)
-
-	memcacheGCTimeTimer  = metrics.NewRegisteredResettingTimer("trie/memcache/gc/time", nil)
-	memcacheGCNodesMeter = metrics.NewRegisteredMeter("trie/memcache/gc/nodes", nil)
-	memcacheGCSizeMeter  = metrics.NewRegisteredMeter("trie/memcache/gc/size", nil)
-
-	memcacheCommitTimeTimer  = metrics.NewRegisteredResettingTimer("trie/memcache/commit/time", nil)
-	memcacheCommitNodesMeter = metrics.NewRegisteredMeter("trie/memcache/commit/nodes", nil)
-	memcacheCommitSizeMeter  = metrics.NewRegisteredMeter("trie/memcache/commit/size", nil)
 )
 
 // secureKeyPrefix is the database key prefix used to store trie node preimages.
@@ -89,8 +68,6 @@ type Database struct {
 	dirtiesSize   common.StorageSize // Storage size of the dirty node cache (exc. metadata)
 	childrenSize  common.StorageSize // Storage size of the external children tracking
 	preimagesSize common.StorageSize // Storage size of the preimages cache
-
-	lock sync.RWMutex
 }
 
 // rawNode is a simple binary blob used to differentiate between collapsed trie
@@ -331,8 +308,8 @@ func (db *Database) DiskDB() ethdb.Reader {
 // reference counting, since trie nodes are garbage collected directly through
 // their embedded children.
 func (db *Database) InsertBlob(hash common.Hash, blob []byte) {
-	db.lock.Lock()
-	defer db.lock.Unlock()
+	
+	
 
 	db.insert(hash, blob, rawNode(blob))
 }
@@ -386,15 +363,13 @@ func (db *Database) node(hash common.Hash) node {
 	// Retrieve the node from the clean cache if available
 	if db.cleans != nil {
 		if enc, err := db.cleans.Get(string(hash[:])); err == nil && enc != nil {
-			memcacheCleanHitMeter.Mark(1)
-			memcacheCleanReadMeter.Mark(int64(len(enc)))
 			return mustDecodeNode(hash[:], enc)
 		}
 	}
 	// Retrieve the node from the dirty cache if available
-	db.lock.RLock()
+	
 	dirty := db.dirties[hash]
-	db.lock.RUnlock()
+	
 
 	if dirty != nil {
 		return dirty.obj(hash)
@@ -406,8 +381,6 @@ func (db *Database) node(hash common.Hash) node {
 	}
 	if db.cleans != nil {
 		db.cleans.Set(string(hash[:]), enc)
-		memcacheCleanMissMeter.Mark(1)
-		memcacheCleanWriteMeter.Mark(int64(len(enc)))
 	}
 	return mustDecodeNode(hash[:], enc)
 }
@@ -422,15 +395,13 @@ func (db *Database) Node(hash common.Hash) ([]byte, error) {
 	// Retrieve the node from the clean cache if available
 	if db.cleans != nil {
 		if enc, err := db.cleans.Get(string(hash[:])); err == nil && enc != nil {
-			memcacheCleanHitMeter.Mark(1)
-			memcacheCleanReadMeter.Mark(int64(len(enc)))
 			return enc, nil
 		}
 	}
 	// Retrieve the node from the dirty cache if available
-	db.lock.RLock()
+	
 	dirty := db.dirties[hash]
-	db.lock.RUnlock()
+	
 
 	if dirty != nil {
 		return dirty.rlp(), nil
@@ -440,8 +411,6 @@ func (db *Database) Node(hash common.Hash) ([]byte, error) {
 	if err == nil && enc != nil {
 		if db.cleans != nil {
 			db.cleans.Set(string(hash[:]), enc)
-			memcacheCleanMissMeter.Mark(1)
-			memcacheCleanWriteMeter.Mark(int64(len(enc)))
 		}
 	}
 	return enc, err
@@ -451,9 +420,9 @@ func (db *Database) Node(hash common.Hash) ([]byte, error) {
 // found cached, the method queries the persistent database for the content.
 func (db *Database) preimage(hash common.Hash) ([]byte, error) {
 	// Retrieve the node from cache if available
-	db.lock.RLock()
+	
 	preimage := db.preimages[hash]
-	db.lock.RUnlock()
+	
 
 	if preimage != nil {
 		return preimage, nil
@@ -475,9 +444,7 @@ func (db *Database) secureKey(key []byte) []byte {
 // This method is extremely expensive and should only be used to validate internal
 // states in test code.
 func (db *Database) Nodes() []common.Hash {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
-
+	
 	var hashes = make([]common.Hash, 0, len(db.dirties))
 	for hash := range db.dirties {
 		if hash != (common.Hash{}) { // Special case for "root" references/nodes
@@ -489,8 +456,8 @@ func (db *Database) Nodes() []common.Hash {
 
 // Reference adds a new reference from a parent node to a child node.
 func (db *Database) Reference(child common.Hash, parent common.Hash) {
-	db.lock.Lock()
-	defer db.lock.Unlock()
+	
+	
 
 	db.reference(child, parent)
 }
@@ -520,24 +487,21 @@ func (db *Database) reference(child common.Hash, parent common.Hash) {
 func (db *Database) Dereference(root common.Hash) {
 	// Sanity check to ensure that the meta-root is not removed
 	if root == (common.Hash{}) {
-		log.Error("Attempted to dereference the trie cache meta root")
+		db.log("Attempted to dereference the trie cache meta root")
 		return
 	}
-	db.lock.Lock()
-	defer db.lock.Unlock()
+	
+	
 
-	nodes, storage, start := len(db.dirties), db.dirtiesSize, SecondsNow()
+	nodes, storage, start := len(db.dirties), db.dirtiesSize, time.Now()
 	db.dereference(root, common.Hash{})
 
 	db.gcnodes += uint64(nodes - len(db.dirties))
 	db.gcsize += storage - db.dirtiesSize
-	db.gctime += TimeSince(start)
+	db.gctime += time.Since(start)
 
-	memcacheGCTimeTimer.Update(TimeSince(start))
-	memcacheGCSizeMeter.Mark(int64(storage - db.dirtiesSize))
-	memcacheGCNodesMeter.Mark(int64(nodes - len(db.dirties)))
 
-	log.Debug("Dereferenced trie from memory database", "nodes", nodes-len(db.dirties), "size", storage-db.dirtiesSize, "time", TimeSince(start),
+	db.log("Dereferenced trie from memory database", "nodes", nodes-len(db.dirties), "size", storage-db.dirtiesSize, "time", time.Since(start),
 		"gcnodes", db.gcnodes, "gcsize", db.gcsize, "gctime", db.gctime, "livenodes", len(db.dirties), "livesize", db.dirtiesSize)
 }
 
@@ -601,7 +565,7 @@ func (db *Database) Cap(limit common.StorageSize) error {
 	// outside code doesn't see an inconsistent state (referenced data removed from
 	// memory cache during commit but not yet in persistent storage). This is ensured
 	// by only uncaching existing data when the database write finalizes.
-	nodes, storage, start := len(db.dirties), db.dirtiesSize, SecondsNow()
+	nodes, storage, start := len(db.dirties), db.dirtiesSize, time.Now()
 	batch := db.diskdb.NewBatch()
 
 	// db.dirtiesSize only contains the useful data in the cache, but when reporting
@@ -616,7 +580,7 @@ func (db *Database) Cap(limit common.StorageSize) error {
 	if flushPreimages {
 		for hash, preimage := range db.preimages {
 			if err := batch.Put(db.secureKey(hash[:]), preimage); err != nil {
-				log.Error("Failed to commit preimage from trie database", "err", err)
+				db.log("Failed to commit preimage from trie database", "err", err)
 				return err
 			}
 			if batch.ValueSize() > ethdb.IdealBatchSize {
@@ -638,7 +602,7 @@ func (db *Database) Cap(limit common.StorageSize) error {
 		// If we exceeded the ideal batch size, commit and reset
 		if batch.ValueSize() >= ethdb.IdealBatchSize {
 			if err := batch.Write(); err != nil {
-				log.Error("Failed to write flush list to disk", "err", err)
+				db.log("Failed to write flush list to disk", "err", err)
 				return err
 			}
 			batch.Reset()
@@ -654,12 +618,12 @@ func (db *Database) Cap(limit common.StorageSize) error {
 	}
 	// Flush out any remainder data from the last batch
 	if err := batch.Write(); err != nil {
-		log.Error("Failed to write flush list to disk", "err", err)
+		db.log("Failed to write flush list to disk", "err", err)
 		return err
 	}
 	// Write successful, clear out the flushed data
-	db.lock.Lock()
-	defer db.lock.Unlock()
+	
+	
 
 	if flushPreimages {
 		db.preimages = make(map[common.Hash][]byte)
@@ -680,13 +644,10 @@ func (db *Database) Cap(limit common.StorageSize) error {
 	}
 	db.flushnodes += uint64(nodes - len(db.dirties))
 	db.flushsize += storage - db.dirtiesSize
-	db.flushtime += TimeSince(start)
+	db.flushtime += time.Since(start)
 
-	memcacheFlushTimeTimer.Update(TimeSince(start))
-	memcacheFlushSizeMeter.Mark(int64(storage - db.dirtiesSize))
-	memcacheFlushNodesMeter.Mark(int64(nodes - len(db.dirties)))
 
-	log.Debug("Persisted nodes from memory database", "nodes", nodes-len(db.dirties), "size", storage-db.dirtiesSize, "time", TimeSince(start),
+	db.log("Persisted nodes from memory database", "nodes", nodes-len(db.dirties), "size", storage-db.dirtiesSize, "time", time.Since(start),
 		"flushnodes", db.flushnodes, "flushsize", db.flushsize, "flushtime", db.flushtime, "livenodes", len(db.dirties), "livesize", db.dirtiesSize)
 
 	return nil
@@ -703,13 +664,13 @@ func (db *Database) Commit(node common.Hash, report bool) error {
 	// outside code doesn't see an inconsistent state (referenced data removed from
 	// memory cache during commit but not yet in persistent storage). This is ensured
 	// by only uncaching existing data when the database write finalizes.
-	start := SecondsNow()
+	start := time.Now()
 	batch := db.diskdb.NewBatch()
 
 	// Move all of the accumulated preimages into a write batch
 	for hash, preimage := range db.preimages {
 		if err := batch.Put(db.secureKey(hash[:]), preimage); err != nil {
-			log.Error("Failed to commit preimage from trie database", "err", err)
+			db.log("Failed to commit preimage from trie database", "err", err)
 			return err
 		}
 		// If the batch is too large, flush to disk
@@ -732,17 +693,17 @@ func (db *Database) Commit(node common.Hash, report bool) error {
 
 	uncacher := &cleaner{db}
 	if err := db.commit(node, batch, uncacher); err != nil {
-		log.Error("Failed to commit trie from trie database", "err", err)
+		db.log("Failed to commit trie from trie database", "err", err)
 		return err
 	}
 	// Trie mostly committed to disk, flush any batch leftovers
 	if err := batch.Write(); err != nil {
-		log.Error("Failed to write trie to disk", "err", err)
+		db.log("Failed to write trie to disk", "err", err)
 		return err
 	}
 	// Uncache any leftovers in the last batch
-	db.lock.Lock()
-	defer db.lock.Unlock()
+	
+	
 
 	batch.Replay(uncacher)
 	batch.Reset()
@@ -751,15 +712,8 @@ func (db *Database) Commit(node common.Hash, report bool) error {
 	db.preimages = make(map[common.Hash][]byte)
 	db.preimagesSize = 0
 
-	memcacheCommitTimeTimer.Update(TimeSince(start))
-	memcacheCommitSizeMeter.Mark(int64(storage - db.dirtiesSize))
-	memcacheCommitNodesMeter.Mark(int64(nodes - len(db.dirties)))
 
-	logger := log.Info
-	if !report {
-		logger = log.Debug
-	}
-	logger("Persisted trie from memory database", "nodes", nodes-len(db.dirties)+int(db.flushnodes), "size", storage-db.dirtiesSize+db.flushsize, "time", TimeSince(start)+db.flushtime,
+	db.log("Persisted trie from memory database", "nodes", nodes-len(db.dirties)+int(db.flushnodes), "size", storage-db.dirtiesSize+db.flushsize, "time", time.Since(start)+db.flushtime,
 		"gcnodes", db.gcnodes, "gcsize", db.gcsize, "gctime", db.gctime, "livenodes", len(db.dirties), "livesize", db.dirtiesSize)
 
 	// Reset the garbage collection statistics
@@ -789,10 +743,9 @@ func (db *Database) commit(hash common.Hash, batch ethdb.Batch, uncacher *cleane
 		if err := batch.Write(); err != nil {
 			return err
 		}
-		db.lock.Lock()
+		
 		batch.Replay(uncacher)
 		batch.Reset()
-		db.lock.Unlock()
 	}
 	return nil
 }
@@ -848,9 +801,7 @@ func (c *cleaner) Delete(key []byte) error {
 // Size returns the current storage size of the memory cache in front of the
 // persistent database layer.
 func (db *Database) Size() (common.StorageSize, common.StorageSize) {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
-
+	
 	// db.dirtiesSize only contains the useful data in the cache, but when reporting
 	// the total memory consumption, the maintenance metadata is also needed to be
 	// counted.
@@ -898,5 +849,11 @@ func (db *Database) accumulate(hash common.Hash, reachable map[common.Hash]struc
 	// Iterate over all the children and accumulate them too
 	for _, child := range node.childs() {
 		db.accumulate(child, reachable)
+	}
+}
+
+func (db *Database) log(a ...interface{})  {
+	if LogConfig.LogDatabase {
+		Print("Database", a)
 	}
 }

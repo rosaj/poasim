@@ -20,9 +20,9 @@ import (
 	"../../common"
 	"../../core/types"
 	"../../ethdb"
+	"../../params"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 

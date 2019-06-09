@@ -3,21 +3,17 @@ package main
 import (
 	. "../common"
 	"../config"
+	"../generate"
 	"../network"
 	"../network/eth"
 	"../network/eth/common"
 	"../network/eth/core"
-	"../network/eth/core/types"
 	"../network/protocol"
 	"../plot"
 	"../util"
-	"crypto/ecdsa"
 	"fmt"
 	"github.com/agoussia/godes"
-	"github.com/ethereum/go-ethereum/crypto"
 	"math"
-	"math/big"
-	"math/rand"
 	"runtime"
 	sysTime "time"
 )
@@ -46,6 +42,7 @@ func newNodeConfig(bootstrapNodes []*network.Node) *network.NodeConfig {
 		MaxPeers: config.SimConfig.MaxPeers,
 		Protocols: protocols,
 		NetworkID: networkId,
+		EthereumConfig: &config.EthConfig,
 	}
 }
 
@@ -112,36 +109,6 @@ func runNodes() []*network.Node {
 func logProgress(a ...interface{})  {
 	util.Print(math.Round((godes.GetSystemTime()/config.SimConfig.SimulationTime)*100), "% elapsed:", sysTime.Since(startTime), a)
 }
-
-var (
-	testBankKey, _  = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
-	testBankAddress = crypto.PubkeyToAddress(testBankKey.PublicKey)
-	testBankFunds   = big.NewInt(1000000000000000000)
-
-	acc1Key, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
-	acc2Key, _ = crypto.HexToECDSA("49a7b37aa6f6645917e7b807e9d1c00d4fa71f18343b0d4122a4d2df64dd6fee")
-	acc1Addr   = crypto.PubkeyToAddress(acc1Key.PublicKey)
-	acc2Addr   = crypto.PubkeyToAddress(acc2Key.PublicKey)
-
-	testContractCode         = common.Hex2Bytes("606060405260cc8060106000396000f360606040526000357c01000000000000000000000000000000000000000000000000000000009004806360cd2685146041578063c16431b914606b57603f565b005b6055600480803590602001909190505060a9565b6040518082815260200191505060405180910390f35b60886004808035906020019091908035906020019091905050608a565b005b80600060005083606481101560025790900160005b50819055505b5050565b6000600060005082606481101560025790900160005b5054905060c7565b91905056")
-	testContractAddr         common.Address
-	testContractCodeDeployed = testContractCode[16:]
-	testContractDeployed     = uint64(2)
-
-	testEventEmitterCode = common.Hex2Bytes("60606040523415600e57600080fd5b7f57050ab73f6b9ebdd9f76b8d4997793f48cf956e965ee070551b9ca0bb71584e60405160405180910390a160358060476000396000f3006060604052600080fd00a165627a7a723058203f727efcad8b5811f8cb1fc2620ce5e8c63570d697aef968172de296ea3994140029")
-	testEventEmitterAddr common.Address
-
-	testBufLimit = uint64(100)
-)
-
-
-// newTestTransaction create a new dummy transaction.
-func newTestTransaction(from *ecdsa.PrivateKey, nonce uint64, datasize int, gasPrice int64) *types.Transaction {
-	tx := types.NewTransaction(nonce, common.Address{}, big.NewInt(0), 100000, big.NewInt(gasPrice), make([]byte, datasize))
-	tx, _ = types.SignTx(tx, types.HomesteadSigner{}, from)
-	return tx
-}
-
 func runSim(){
 
 	runtime.GOMAXPROCS(1)
@@ -154,6 +121,22 @@ func runSim(){
 	godes.Advance(config.SimConfig.NodeStabilisationTime)
 
 
+	generate.AsyncTxs(nodes[:config.SimConfig.NodeCount], 1000, 600, 0.08)
+
+	/*
+
+	generate.AsyncTxs(nodes[:config.SimConfig.NodeCount], 1000, 180, 0.05)
+	godes.Advance(15)
+	generate.AsyncTxs(nodes[:config.SimConfig.NodeCount], 1000, 180, 0.05)
+	godes.Advance(15)
+	generate.AsyncTxs(nodes[:config.SimConfig.NodeCount], 1000, 180, 0.05)
+
+	//godes.Advance(15)
+
+	generate.AsyncTxs(nodes[:config.SimConfig.NodeCount], 1000, 100, 0.02)
+	generate.AsyncTxs(nodes[:config.SimConfig.NodeCount], 1000, 100, 0.03)
+	generate.AsyncTxs(nodes[:config.SimConfig.NodeCount], 1000, 100, 0.04)
+	generate.AsyncTxs(nodes[:config.SimConfig.NodeCount], 1000, 100, 0.05)
 
 	/*
 	 for !config.SimConfig.SimulationEnded() {
@@ -167,29 +150,50 @@ func runSim(){
 
 		 logProgress("------")
 	 }
-	*/
 
 	//godes.Advance(5 * 60)
-	interval := 1.0
-	times := 5
+	interval := 0.1
+	times := 0
 	counter := 0
 	for times > 0 {
 		times-=1
 
 		godes.Advance(interval)
 		//interval+=1
-		key := acc1Key
+		key := core.BankKey
 
 		txs := make(types.Transactions,0)
 
 		//tx := types.NewTransaction(uint64(times), common.Address(acc1Addr), big.NewInt(1000), 10000, big.NewInt(1999), nil)
-		tx, _ := types.SignTx(types.NewTransaction(uint64(counter), common.Address(acc1Addr), big.NewInt(1), 1000000, big.NewInt(10000000000), nil), types.HomesteadSigner{}, key)
-		util.Print(counter, tx.Nonce())
+		tx, _ := types.SignTx(types.NewTransaction(uint64(counter), common.Address(acc2Addr), big.NewInt(1), 1000000, big.NewInt(10000000000), nil), types.HomesteadSigner{}, key)
 		txs = append(txs, tx)
-		util.Print(rand.Intn(config.SimConfig.NodeCount))
-		nodes[rand.Intn(config.SimConfig.NodeCount)].Server().GetProtocolManager().AddTxs(txs)
+		nodeIndex := rand.Intn(config.SimConfig.NodeCount)
+		util.Print("Adding new tx to node", nodeIndex + 1, "nonce", tx.Nonce())
+
+		errors := nodes[nodeIndex].Server().GetProtocolManager().AddTxs(txs)
+		for _, err := range errors {
+			if err != nil {
+				util.Print("Error when adding new tx nonce", tx.Nonce())
+			}
+		}
+
+		for i := 0; i < config.SimConfig.NodeCount; i+=1 {
+//			logProgress(i, nodes[i].Server().GetProtocolManager().PendingTxCount())
+		}
 		counter += 1
 	}
+
+	times = 10
+	for times > 0{
+		times -= 1
+		godes.Advance(10)
+		for i := 0; i < config.SimConfig.NodeCount; i+=1 {
+	//		logProgress(i, nodes[i].Server().GetProtocolManager().PendingTxCount())
+		}
+
+	}
+
+	*/
 
 
 /*
@@ -289,36 +293,42 @@ func waitForEnd(nodes []*network.Node)  {
 	bc := es.BlockChain()
 
 	max := bc.CurrentBlock().NumberU64()
-//	hash := bc.CurrentBlock().Hash()
 
 	util.Print("Last block", max)
 
 	for i := 0; i < config.SimConfig.NodeCount ; i+=1  {
 		ob := nodes[i].Server().(*eth.Ethereum).BlockChain().CurrentBlock()
 		util.Print(i, ob.NumberU64())
-
-		/*
-		ob := nodes[i].Server().(*eth.Ethereum).BlockChain().GetBlockByNumber(uint64(max))
-		if ob == nil || hash != ob.Hash() {
-			util.Print("Hash missmatch block", max, "node", i)
-		}
-
-		 */
 	}
 
-
-
+	total := 0
 	for i := max;i >= 1 ; i-=1  {
 		block := bc.GetBlockByNumber(uint64(i))
 		if block != nil {
-			util.Print(block.Number(), "tx count", block.Transactions().Len())
+			signAddr, err := bc.Engine().Author(block.Header())
+			if err != nil {
+				util.LogError(err)
+			}
+			signer := findNodeByAddress(nodes, signAddr)
+
+			util.Print(block.Number(), "tx count", block.Transactions().Len(), "signer", signer)
+			total += len(block.Transactions())
 		} else {
 			util.Print("block", i, "je nil")
 		}
 	}
 
+	util.Print("Total num of txs", total)
 }
 
+func findNodeByAddress(nodes []*network.Node, address common.Address) *network.Node {
+	for _, node := range nodes {
+		if node.Address() == address {
+			return node
+		}
+	}
+	return nil
+}
 
 func showStats(nodes []*network.Node)  {
 

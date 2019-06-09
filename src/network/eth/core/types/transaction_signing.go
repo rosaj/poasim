@@ -18,13 +18,13 @@ package types
 
 import (
 	"../../../eth/common"
+	"../../params"
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
 )
 
 var (

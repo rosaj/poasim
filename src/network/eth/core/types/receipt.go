@@ -18,6 +18,7 @@ package types
 
 import (
 	"../../common"
+	"../../params"
 	"bytes"
 	"errors"
 	"fmt"
@@ -29,7 +30,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 

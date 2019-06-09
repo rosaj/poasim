@@ -17,9 +17,9 @@
 package vm
 
 import (
+	"../../../eth/params"
 	"../../common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
 	"math/big"
 )
 

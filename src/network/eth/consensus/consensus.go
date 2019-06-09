@@ -21,10 +21,10 @@ import (
 	"../common"
 	"../core/state"
 	"../core/types"
+	"../params"
 
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 

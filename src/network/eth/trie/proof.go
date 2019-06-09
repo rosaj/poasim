@@ -17,13 +17,13 @@
 package trie
 
 import (
-	"../../eth/common"
+	. "../../../util"
+	"../common"
 	"../ethdb"
 	"bytes"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -58,7 +58,7 @@ func (t *Trie) Prove(key []byte, fromLevel uint, proofDb ethdb.Writer) error {
 			var err error
 			tn, err = t.resolveHash(n, nil)
 			if err != nil {
-				log.Error(fmt.Sprintf("Unhandled trie error: %v", err))
+				Print(fmt.Sprintf("Unhandled trie error: %v", err))
 				return err
 			}
 		default:
