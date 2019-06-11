@@ -24,6 +24,7 @@ import (
 	. "../../util"
 	"../eth/common"
 	"../eth/consensus"
+	"../eth/consensus/aura"
 	"../eth/consensus/clique"
 	"../eth/core"
 	"../eth/core/rawdb"
@@ -33,6 +34,7 @@ import (
 	"../eth/miner"
 	"../eth/params"
 	"fmt"
+	"github.com/agoussia/godes"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/crypto"
 	"math/big"
@@ -186,6 +188,8 @@ func CreateConsensusEngine(name string, chainConfig *params.ChainConfig, db ethd
 	// If proof-of-authority is requested, set it up
 	if chainConfig.Clique != nil {
 		return clique.New(name, chainConfig.Clique, db)
+	} else if chainConfig.Aura != nil {
+		return aura.New(name, chainConfig.Aura, db)
 	}
 	return nil
 }
@@ -298,6 +302,11 @@ func (s *Ethereum) StartMining() error {
 				hash := crypto.Keccak256(data)
 				return crypto.Sign(hash, s.Self().PrivateKey())
 			})
+		} else if aura, ok := s.engine.(*aura.Aura); ok {
+			aura.Authorize(eb, func(account accounts.Account, data []byte) (bytes []byte, e error) {
+				hash := crypto.Keccak256(data)
+				return crypto.Sign(hash, s.Self().PrivateKey())
+			})
 		}
 
 		// If mining is started, we can disable the transaction rejection mechanism
@@ -305,17 +314,18 @@ func (s *Ethereum) StartMining() error {
 		atomic.StoreUint32(&s.protocolManager.acceptTxs, 1)
 
 		s.miner.SetEtherbase(eb)
-
-		if initialStart < 2 {
-			initialStart += 1
+		StartNewRunner(func() {
+			godes.Advance(30)
 			s.miner.Start(eb)
-		}
+			s.log("Starting to mine")
+		})
+
+
 	}
 
-	s.log("Starting to mine")
 	return nil
 }
-var initialStart = 0
+
 
 // StopMining terminates the miner, both at the consensus engine level as well as
 // at the block creation level.

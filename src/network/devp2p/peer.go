@@ -225,13 +225,18 @@ func (p *Peer) newHandshakeMsg(onHandshake func(err error)) *Message {
 
 	return NewMessage(p.Self(), p.Node(), DEVP2P_HANDSHAKE, handshakeMsg, 0,
 			func(m *Message) {
-				handshakePeer := p.Node().Server().RetrieveHandshakePeer(p.Self())
+				srv := p.Node().Server()
 
-				if handshakePeer != nil {
-					onHandshake(nil)
-				} else {
-					onHandshake(DiscReadTimeout)
+				if srv != nil{
+					handshakePeer := srv.RetrieveHandshakePeer(p.Self())
+
+					if handshakePeer != nil {
+						onHandshake(nil)
+						return
+					}
 				}
+
+				onHandshake(DiscReadTimeout)
 
 			}, nil, func(m *Message, err error) {
 				p.Node().Server().RetrieveHandshakePeer(p.Self())

@@ -78,19 +78,24 @@ var MetricConfig  = metricConfig {
 
 var EthConfig = EthereumConfig {
 	ChainConfig: ChainConfig,
-	MinerConfig: DefaultMinerConfig,
-	TxPoolConfig: DefaultTxPoolConfig,
+	MinerConfig: defaultMinerConfig,
+	TxPoolConfig: defaultTxPoolConfig,
 }
 
 
 var ChainConfig = &chainConfig {
+	Engine:	AURA,
 	Clique: & CliqueConfig {
 		Period: 15,
 		Epoch:	30000,
 	},
+	Aura:	&AuraConfig {
+		Period: 15,
+		Epoch:  30000,
+	},
 }
 
-var	TxPoolConfig = &txPoolConfig {
+var	testTxPoolConfig = &txPoolConfig {
 
 	PriceLimit: 1,
 	PriceBump:  10,
@@ -103,7 +108,7 @@ var	TxPoolConfig = &txPoolConfig {
 	Lifetime: 3 * time.Hour,
 }
 
-var DefaultTxPoolConfig = &txPoolConfig {
+var defaultTxPoolConfig = &txPoolConfig {
 	PriceLimit: 1,
 	PriceBump:  10,
 
@@ -116,14 +121,14 @@ var DefaultTxPoolConfig = &txPoolConfig {
 }
 
 
-var	MinerConfig = &minerConfig {
+var	testMinerConfig = &minerConfig {
 	GasFloor: 999999999999,
 	GasCeil:  999999999999,
 	GasPrice: big.NewInt(params.Wei),
 	Recommit: 3 * time.Second,
 }
 
-var	DefaultMinerConfig = &minerConfig {
+var	defaultMinerConfig = &minerConfig {
 	//Default 8000000
 	GasFloor: 8000000,
 	GasCeil:  8000000,

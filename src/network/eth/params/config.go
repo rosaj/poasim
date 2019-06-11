@@ -1,6 +1,7 @@
 package params
 
 import (
+	"../common"
 	"math/big"
 )
 
@@ -86,6 +87,8 @@ type ChainConfig struct {
 	ChainID *big.Int  `json:"chainId"`// chainId identifies the current chain and is used for replay protection
 
 	Clique *CliqueConfig `json:"clique,omitempty"`
+
+	Aura *AuraConfig
 }
 
 
@@ -100,4 +103,24 @@ type CliqueConfig struct {
 // String implements the stringer interface, returning the consensus engine details.
 func (c *CliqueConfig) String() string {
 	return "clique"
+}
+
+
+
+type Signature []byte
+type Signatures []Signature
+
+// AuraConfig is the consensus engine configs for proof-of-authority based sealing.
+type AuraConfig struct {
+	Period      uint64           `json:"period"`      // Number of seconds between blocks to enforce
+	Epoch       uint64           `json:"epoch"`       // Epoch length to reset votes and checkpoint
+	Authorities []common.Address `json:"authorities"` // list of addresses of authorities
+	Difficulty  *big.Int         `json:"difficulty"`  // Constant block difficulty
+	Signatures   Signatures           `json:"signatures"`
+}
+
+
+// String implements the stringer interface, returning the consensus engine details.
+func (c *AuraConfig) String() string {
+	return "aura"
 }

@@ -17,6 +17,7 @@
 package core
 
 import (
+
 	. "../../../common"
 	"../../../config"
 	"../common"
@@ -97,21 +98,30 @@ type GenesisAccount struct {
 
 
 func SetupGenesisBlockWithOverride(db ethdb.Database, ethConfig *config.EthereumConfig) (*params.ChainConfig, common.Hash, error) {
-	config := ethConfig.ChainConfig
+	conf := ethConfig.ChainConfig
 
 	var cliqueConfig *params.CliqueConfig = nil
+	var auraConfig *params.AuraConfig = nil
 
-	if config != nil {
+	if conf.Engine == config.CLIQUE {
 		cliqueConfig = &params.CliqueConfig {
-			Period: config.Clique.Period,
-			Epoch: config.Clique.Epoch,
+			Period: conf.Clique.Period,
+			Epoch: conf.Clique.Epoch,
 		}
+	} else if conf.Engine == config.AURA {
+		auraConfig = &params.AuraConfig {
+			Difficulty: big.NewInt(1),
+			Period: conf.Aura.Period,
+			Epoch:  conf.Aura.Epoch,
+		}
+	} else {
+		panic("No consensus engine set")
 	}
 
 	genesis := &Genesis{
 		Config: 	&params.ChainConfig {
-
 			Clique: cliqueConfig,
+			Aura:   auraConfig,
 		},
 		Timestamp:  0,
 		GasLimit:   4700000,
@@ -142,6 +152,12 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 
 	g.setExtraData()
 
+	if g.Config.Aura != nil {
+		for _, node := range Sealers {
+			g.Config.Aura.Authorities = append(g.Config.Aura.Authorities, node.Address())
+		}
+	}
+
 	root := statedb.IntermediateRoot(false)
 	head := &types.Header{
 		Number:     new(big.Int).SetUint64(0),
@@ -165,7 +181,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 }
 
 func (g *Genesis) setExtraData()  {
-	if g.Config.Clique != nil {
+	//if g.Config.Clique != nil {
 
 		extraVanity := 32
 		extraSeal := 65
@@ -184,7 +200,7 @@ func (g *Genesis) setExtraData()  {
 
 		g.ExtraData = append(g.ExtraData, make([]byte, extraSeal)...)
 
-	}
+	//}
 }
 
 // Commit writes the block and state of a genesis specification to the database.

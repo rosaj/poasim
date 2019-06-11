@@ -103,8 +103,9 @@ type EthereumConfig struct {
 }
 
 type chainConfig struct {
+	Engine ConsensusEngine
 	Clique *CliqueConfig
-
+	Aura   *AuraConfig
 }
 
 // CliqueConfig is the consensus engine configs for proof-of-authority based sealing.
@@ -113,6 +114,18 @@ type CliqueConfig struct {
 	Epoch  uint64 // Epoch length to reset votes and checkpoint
 }
 
+
+// AuraConfig is the consensus engine configs for proof-of-authority based sealing.
+type AuraConfig struct {
+	Period uint64 // Number of seconds between blocks to enforce
+	Epoch  uint64 // Epoch length to reset votes and checkpoint
+}
+
+type ConsensusEngine int
+var (
+	CLIQUE	  = ConsensusEngine(1)
+	AURA	= ConsensusEngine(2)
+)
 
 
 type txPoolConfig struct {

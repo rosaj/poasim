@@ -195,7 +195,11 @@ func (n *Node) GetTableStats() map[float64][]int {
 }
 
 func (n *Node) GetServerPeersStats() map[float64][]int  {
-	return n.Server().GetPeerStats()
+	srv := n.Server()
+	if srv != nil {
+		return n.Server().GetPeerStats()
+	}
+	return make(map[float64][]int, 0)
 }
 
 func (n *Node) setOnline(online bool)  {
@@ -347,8 +351,9 @@ func (n *Node) Run() {
 	// kad se pokrene p2p ovdje je i dalje godes vrijeme 0
 	n.startP2P()
 
-
-	n.startServer()
+	if !n.isBootstrapNode {
+		n.startServer()
+	}
 
 	nodeCountChanged(true)
 

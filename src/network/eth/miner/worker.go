@@ -377,7 +377,10 @@ func (w *worker) Run()  {
 
 		// If mining is running resubmit a new work cycle periodically to pull in
 		// higher priced transactions. Disable this overhead for pending blocks.
-		if w.isRunning() && (w.chainConfig.Clique == nil || w.chainConfig.Clique.Period > 0) {
+		if w.isRunning() &&
+			(w.chainConfig.Clique == nil || w.chainConfig.Clique.Period > 0)  &&
+			(w.chainConfig.Aura == nil || w.chainConfig.Aura.Period > 0){
+
 			// Short circuit if no new transaction arrives.
 			if atomic.LoadInt32(&w.newTxs) == 0 {
 				w.recommitTime = w.recommit
@@ -454,9 +457,10 @@ func (w *worker) handleTxEvent(ev core.NewTxsEvent)  {
 		w.commitTransactions(txset, coinbase, nil)
 		w.updateSnapshot()
 	} else {
-		// If clique is running in dev mode(period is 0), disable
+		// If clique or aura is running in dev mode(period is 0), disable
 		// advance sealing here.
-		if w.chainConfig.Clique != nil && w.chainConfig.Clique.Period == 0 {
+		if (w.chainConfig.Clique != nil && w.chainConfig.Clique.Period == 0 ) ||
+			(w.chainConfig.Aura != nil && w.chainConfig.Aura.Period == 0 ) {
 			w.commitNewWork(nil, true, int64(SecondsNow()))
 		}
 	}

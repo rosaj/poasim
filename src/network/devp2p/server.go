@@ -280,6 +280,9 @@ func (srv *Server) run(dialstate dialer) {
 // as a peer. It returns when the connection has been added as a peer
 // or the handshakes have failed.
 func (srv *Server) SetupConn(flags connFlag, node INode) error {
+	if node.Server() == nil {
+		return nil
+	}
 
 	peer := NewPeer(srv, node)
 	peer.flags = flags
