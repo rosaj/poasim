@@ -19,6 +19,7 @@ package core
 import (
 	"../../../config"
 	. "../../../util"
+	. "../../../common"
 	"../../eth/common"
 	"../../eth/common/prque"
 	"../../eth/consensus"
@@ -92,6 +93,13 @@ const (
 	TxStatusQueued
 	TxStatusPending
 	TxStatusIncluded
+)
+
+const(
+
+	PendingTxs = "Pending txs"
+	QueuedTxs  = "Queued txs"
+
 )
 
 // blockChain provides the state of blockchain and current gas limit to do
@@ -194,6 +202,8 @@ func (config *TxPoolConfig) log(a ...interface{})  {
 // two states over time as they are received and processed.
 type TxPool struct {
 	*godes.Runner
+	*MetricCollector
+
 	name		 string
 
 	config       TxPoolConfig
@@ -227,6 +237,7 @@ func NewTxPool(name string, config TxPoolConfig, chainconfig *params.ChainConfig
 	// Create the transaction pool with its initial settings
 	pool := &TxPool{
 		Runner:		 &godes.Runner{},
+		MetricCollector:NewMetricCollector(),
 		name: 		 name,
 		config:      config,
 		chainconfig: chainconfig,
@@ -425,6 +436,8 @@ func (pool *TxPool) Stop() {
 func (pool *TxPool) Start()  {
 	if pool.IsShedulled() {
 		godes.Resume(pool, 0)
+	} else {
+		pool.loop()
 	}
 }
 
@@ -477,6 +490,13 @@ func (pool *TxPool) stats() (int, int) {
 		queued += list.Len()
 	}
 	return pending, queued
+}
+
+func (pool *TxPool) logStats() {
+	pending, queued := pool.stats()
+
+	pool.Set(QueuedTxs, queued)
+	pool.Set(PendingTxs, pending)
 }
 
 // Content retrieves the data content of the transaction pool, returning all the
@@ -1039,6 +1059,8 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 			}
 		}
 	}
+
+	pool.logStats()
 }
 
 // demoteUnexecutables removes invalid and processed transactions from the pools

@@ -17,7 +17,6 @@
 package core
 
 import (
-	. "../../../util"
 	"../../eth/common"
 	"../../eth/ethdb"
 	"../consensus"
@@ -28,15 +27,13 @@ import (
 	crand "crypto/rand"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/log"
 	"math"
 	"math/big"
 	mrand "math/rand"
 	"sync/atomic"
-	"time"
 
-	"github.com/ethereum/go-ethereum/log"
-
-	lru "github.com/hashicorp/golang-lru"
+	"github.com/hashicorp/golang-lru"
 )
 
 const (
@@ -285,6 +282,7 @@ func (hc *HeaderChain) InsertHeaderChain(chain []*types.Header, writeHeader WhCa
 		}
 		stats.processed++
 	}
+	/*
 	// Report some public statistics so the user has a clue what's going on
 	last := chain[len(chain)-1]
 
@@ -299,6 +297,7 @@ func (hc *HeaderChain) InsertHeaderChain(chain []*types.Header, writeHeader WhCa
 		context = append(context, []interface{}{"ignored", stats.ignored}...)
 	}
 	log.Info("Imported new block headers", context...)
+	*/
 
 	return 0, nil
 }

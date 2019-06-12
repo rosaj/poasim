@@ -71,7 +71,7 @@ var LogConfig = logConfig {
 
 var MetricConfig  = metricConfig {
 
-	GroupFactor: 60,
+	GroupFactor: 1,
 
 }
 
@@ -84,7 +84,7 @@ var EthConfig = EthereumConfig {
 
 
 var ChainConfig = &chainConfig {
-	Engine:	AURA,
+	Engine:	CLIQUE,
 	Clique: & CliqueConfig {
 		Period: 15,
 		Epoch:	30000,

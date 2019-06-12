@@ -1,9 +1,10 @@
 package plot
 
 import (
+	"../common"
 	"../config"
 	. "../network"
-	. "../network/message"
+	. "../network/eth/core"
 	"../util"
 	"encoding/csv"
 	"fmt"
@@ -18,6 +19,19 @@ import (
 	"sort"
 	"strconv"
 )
+
+var	blockchain_metrics = [...]string{
+		NonContiguousInsert,
+		NonContiguousReceiptInsert,
+		BadBlock,
+		InsertNewBlock,
+		InsertForkedBlock,
+		SidechainDetected,
+		SidechainInject,
+		MissingParent,
+		ChainSplitDetected,
+		ChainSplitDepth,
+	}
 
 func addPoints(vals map[float64]float64, key string, ptss map[string]plotter.XYs)  {
 
@@ -113,35 +127,8 @@ func Stats(nodes []*Node)  {
 			vals[val.Time] += 1
 		}
 		addPoints(vals, key, ptss)
-
 	}
 
-
-
-	/*
-
-	tStats := make(map[float64][]float64)
-
-	for _, node := range nodes {
-		tableStats := node.GetTableStats()
-		for k, v := range tableStats {
-			sum := 0
-			for _, intVal := range v {
-				sum += intVal
-			}
-			tStats[k] = append(tStats[k], float64(sum/len(v)))
-		}
-	}
-
-
-	vals := make(map[float64]float64)
-	for k,v := range tStats {
-		vals[k] = godes.Mean(v)
-	}
-
-	addPoints(vals, "TABLE", ptss)
-
-*/
 
 	calcMeanPoints(nodes, func(n *Node) map[float64][]int {
 		return n.GetTableStats()
@@ -168,9 +155,74 @@ func Stats(nodes []*Node)  {
 
 	addPoints(vals, "NODES", ptss)
 
+	for name, vals := range common.GlobalCollector.CollectMetrics() {
+		addPoints(vals, name, ptss)
+	}
+
+	/*
+	for _, node := range nodes {
+
+		srv := node.Server()
+		if srv == nil {
+			continue
+		}
+		eth := srv.(*Ethereum)
+		m := eth.BlockChain().CollectMetrics()
+
+		for name, vals := range m {
+			addPoints(vals, name, ptss)
+		}
+	}
+	*/
+/*
+	bStats := make(map[string]map[float64]int)
+	ethNodes := 0
+
+	for _, node := range nodes {
+		srv := node.Server()
+		if srv == nil {
+			continue
+		}
+		eth := srv.(*Ethereum)
+		ethNodes += 1
+		bcStats := eth.BlockChain().GetMetrics()
+
+		for k, v := range bcStats {
+			if bStats[k] == nil {
+				bStats[k] = make(map[float64]int)
+			}
+
+			for k1, v1 := range v {
+				bStats[k][k1] += v1
+			}
+		}
+
+
+	}
+
+
+	vals = make(map[float64]float64)
+	for k, v := range bStats {
+		for k1, v1 := range v {
+			vals[k1] = float64(v1) // / float64(ethNodes)
+		}
+		addPoints(vals, k, ptss)
+	}
+*/
 
 	fmt.Println("Points prepared")
 
+	//stats := [...]string{ }
+	stats := blockchain_metrics
+
+
+	lines := make([]interface{}, 0)
+
+	for _, name := range stats {
+		lines = append(lines, name, ptss[name])
+	}
+	err = plotutil.AddLines(p, lines...)
+/*
 	err = plotutil.AddLines(p,
 //		"Ping", ptss["PING"],
 //		"Pong", ptss["PONG"],
@@ -191,7 +243,7 @@ func Stats(nodes []*Node)  {
 //		DEVP2P_HANDSHAKE, ptss[DEVP2P_HANDSHAKE],
 //		STATUS_MSG, ptss[STATUS_MSG],
 		)
-
+*/
 	if err != nil {
 		panic(err)
 	}

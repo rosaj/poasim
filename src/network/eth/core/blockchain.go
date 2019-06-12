@@ -18,6 +18,7 @@
 package core
 
 import (
+	. "../../../common"
 	"../../../config"
 	. "../../../util"
 	"../../eth/common"
@@ -28,6 +29,7 @@ import (
 	"../core/rawdb"
 	"../core/state"
 	"../trie"
+
 	"github.com/agoussia/godes"
 
 	"../core/types"
@@ -75,6 +77,20 @@ const (
 	BlockChainVersion uint64 = 5
 )
 
+
+const (
+	NonContiguousInsert 		= "non contiguous insert"
+	NonContiguousReceiptInsert 	= "non contiguous receipt insert"
+	BadBlock            		= "bad block"
+	InsertNewBlock      		= "insert new block"
+	InsertForkedBlock   		= "insert forked block"
+	SidechainDetected   		= "sidechain detected"
+	SidechainInject     		= "sidechain inject"
+	MissingParent       		= "missing parent"
+	ChainSplitDetected  		= "chain split detected"
+	ChainSplitDepth				= "chain split depth"
+
+)
 // CacheConfig contains the configuration values for the trie caching/pruning
 // that's resident in a blockchain.
 type CacheConfig struct {
@@ -101,6 +117,8 @@ type CacheConfig struct {
 // canonical chain.
 type BlockChain struct {
 	*godes.Runner
+	*MetricCollector
+
 	name 		string
 	chainConfig *params.ChainConfig // Chain & network configuration
 	cacheConfig *CacheConfig        // Cache configuration for pruning
@@ -143,6 +161,7 @@ type BlockChain struct {
 	badBlocks      *lru.Cache              // Bad block cache
 	shouldPreserve func(*types.Block) bool // Function used to determine whether should preserve the given block.
 
+
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -165,6 +184,7 @@ func NewBlockChain(name string, db ethdb.Database, cacheConfig *CacheConfig, cha
 
 	bc := &BlockChain{
 		Runner:			&godes.Runner{},
+		MetricCollector:NewMetricCollector(),
 		name:			name,
 		chainConfig:    chainConfig,
 		cacheConfig:    cacheConfig,
@@ -445,8 +465,6 @@ func (bc *BlockChain) Export(w io.Writer) error {
 // ExportN writes a subset of the active chain to the given writer.
 func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 
-
-
 	if first > last {
 		return fmt.Errorf("export failed: first (%d) is greater than last (%d)", first, last)
 	}
@@ -718,6 +736,8 @@ func (bc *BlockChain) Start()  {
 
 	if bc.IsShedulled() {
 		godes.Resume(bc, 0)
+	} else {
+		bc.update()
 	}
 
 }
@@ -781,6 +801,9 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 		if blockChain[i].NumberU64() != blockChain[i-1].NumberU64()+1 || blockChain[i].ParentHash() != blockChain[i-1].Hash() {
 			bc.log("Non contiguous receipt insert", "number", blockChain[i].Number(), "hash", blockChain[i].Hash(), "parent", blockChain[i].ParentHash(),
 				"prevnumber", blockChain[i-1].Number(), "prevhash", blockChain[i-1].Hash())
+
+			bc.Update(NonContiguousReceiptInsert, 1)
+
 			return 0, fmt.Errorf("non contiguous insert: item %d is #%d [%x…], item %d is #%d [%x…] (parent [%x…])", i-1, blockChain[i-1].NumberU64(),
 				blockChain[i-1].Hash().Bytes()[:4], i, blockChain[i].NumberU64(), blockChain[i].Hash().Bytes()[:4], blockChain[i].ParentHash().Bytes()[:4])
 		}
@@ -959,7 +982,6 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 				triedb.Dereference(root.(common.Hash))
 			}
 
-
 		}
 	}
 
@@ -1051,6 +1073,8 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 			// Chain broke ancestry, log a message (programming error) and skip insertion
 			bc.log("Non contiguous block insert", "number", block.Number(), "hash", block.Hash(),
 				"parent", block.ParentHash(), "prevnumber", prev.Number(), "prevhash", prev.Hash())
+
+			bc.Update(NonContiguousInsert, 1)
 
 			return 0, fmt.Errorf("non contiguous insert: item %d is #%d [%x…], item %d is #%d [%x…] (parent [%x…])", i-1, prev.NumberU64(),
 				prev.Hash().Bytes()[:4], i, block.NumberU64(), block.Hash().Bytes()[:4], block.ParentHash().Bytes()[:4])
@@ -1216,6 +1240,8 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 				"elapsed", TimeSince(start),
 				"root", block.Root())
 
+			bc.Update(InsertNewBlock, 1)
+
 			coalescedLogs = append(coalescedLogs, logs...)
 			events = append(events, ChainEvent{block, block.Hash()})
 			lastCanon = block
@@ -1228,6 +1254,9 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 				"diff", block.Difficulty(), "elapsed", TimeSince(start),
 				"txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()),
 				"root", block.Root())
+
+			bc.Update(InsertForkedBlock, 1)
+
 			events = append(events, ChainSideEvent{block})
 		}
 		stats.processed++
@@ -1293,6 +1322,8 @@ func (bc *BlockChain) insertSidechain(block *types.Block, it *insertIterator) (i
 				// having verified the state of the previous blocks.
 				bc.log("Sidechain ghost-state attack detected", "number", block.NumberU64(), "sideroot", block.Root(), "canonroot", canonical.Root())
 
+				bc.Update(SidechainDetected, 1)
+
 				// If someone legitimately side-mines blocks, they would still be imported as usual. However,
 				// we cannot risk writing unverified blocks to disk when they obviously target the pruning
 				// mechanism.
@@ -1307,12 +1338,15 @@ func (bc *BlockChain) insertSidechain(block *types.Block, it *insertIterator) (i
 		if !bc.HasBlock(block.Hash(), block.NumberU64()) {
 			start := SecondsNow()
 			if err := bc.WriteBlockWithoutState(block, externTd); err != nil {
-				return it.index, nil, nil, err
+				return it.index,
+				nil, nil, err
 			}
 			bc.log("Injected sidechain block", "number", block.Number(), "hash", block.Hash(),
 				"diff", block.Difficulty(), "elapsed", TimeSince(start),
 				"txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()),
 				"root", block.Root())
+
+			bc.Update(SidechainInject, 1)
 		}
 	}
 	// At this point, we've written all sidechain blocks to database. Loop ended
@@ -1339,6 +1373,7 @@ func (bc *BlockChain) insertSidechain(block *types.Block, it *insertIterator) (i
 		parent = bc.GetHeader(parent.ParentHash, parent.Number.Uint64()-1)
 	}
 	if parent == nil {
+		bc.Update(MissingParent, 1)
 		return it.index, nil, nil, errors.New("missing parent")
 	}
 	// Import all the pruned blocks to make the state available
@@ -1463,6 +1498,8 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	if len(oldChain) > 0 && len(newChain) > 0 {
 		bc.log("Chain split detected", "number", commonBlock.Number(), "hash", commonBlock.Hash(),
 			"drop", len(oldChain), "dropfrom", oldChain[0].Hash(), "add", len(newChain), "addfrom", newChain[0].Hash())
+		bc.Update(ChainSplitDetected, 1)
+		bc.Update(ChainSplitDepth, len(oldChain))
 	} else {
 		bc.log("Impossible reorg, please file an issue", "oldnum", oldBlock.Number(), "oldhash", oldBlock.Hash(), "newnum", newBlock.Number(), "newhash", newBlock.Hash())
 	}
@@ -1582,6 +1619,8 @@ Hash: 0x%x
 Error: %v
 ##############################
 `, bc.chainConfig, block.Number(), block.Hash(), receiptString, err))
+
+	bc.Update(BadBlock, 1)
 }
 
 // InsertHeaderChain attempts to insert the given header chain in to the local
