@@ -123,6 +123,8 @@ func runSim(){
 
 	generate.AsyncTxs(nodes[:config.SimConfig.NodeCount], 1000, 600, 0.08)
 
+	//TODO: metrike npr. blockchain broj insert-a, forka, sidechaina, txs received etc
+
 	/*
 
 	generate.AsyncTxs(nodes[:config.SimConfig.NodeCount], 1000, 180, 0.05)
