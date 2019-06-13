@@ -86,10 +86,19 @@ type logConfig struct {
 	LogDatabase bool
 }
 
+type ExportType string
+var (
+	PNG = ExportType("png")
+	CSV = ExportType("csv")
+)
 type metricConfig struct {
 	// jedinica po kojoj se grupiraju poruke
 	// npr. 60 znaci da se poruke grupiraju po minuti
 	GroupFactor float64
+
+	Metrics []string
+
+	ExportType ExportType
 
 }
 

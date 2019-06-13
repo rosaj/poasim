@@ -78,12 +78,12 @@ type UDP struct {
 }
 
 
-func NewUDP(node INode) (*Table, *UDP) {
+func NewUDP(node INode, metricCollector IMetricCollector) (*Table, *UDP) {
 	udp := &UDP{
 		node:       	 node,
 		db:              newDB(),
 	}
-	tab := newTable(udp, node.GetBootstrapNodes())
+	tab := newTable(metricCollector, udp, node.GetBootstrapNodes())
 	udp.tab = tab
 
 	return udp.tab, udp

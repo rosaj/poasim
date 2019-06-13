@@ -129,7 +129,7 @@ func resolveConfig(nodeConfig *EthereumConfig) *Config {
 
 // New creates a new Ethereum object (including the
 // initialisation of the common Ethereum object)
-func New(node INode) (*Ethereum, error) {
+func New(node INode,  metricCollector IMetricCollector) (*Ethereum, error) {
 	config := resolveConfig(node.GetConfig())
 
 //	log.Info("Allocated trie memory caches", "clean", common.StorageSize(config.TrieCleanCache)*1024*1024, "dirty", common.StorageSize(config.TrieDirtyCache)*1024*1024)
@@ -144,7 +144,7 @@ func New(node INode) (*Ethereum, error) {
 	//log.Info("Initialised chain configuration", "config", chainConfig)
 
 	eth := &Ethereum {
-		Server:			devp2p.NewServer(node),
+		Server:			devp2p.NewServer(node, metricCollector),
 		config:         config,
 		chainDb:        chainDb,
 		engine:         CreateConsensusEngine(node.Name(), chainConfig, chainDb),
@@ -167,14 +167,14 @@ func New(node INode) (*Ethereum, error) {
 	)
 
 	var err error
-	eth.blockchain, err = core.NewBlockChain(node.Name() ,chainDb, cacheConfig, chainConfig, eth.engine, eth.shouldPreserve)
+	eth.blockchain, err = core.NewBlockChain(node.Name(), metricCollector, chainDb, cacheConfig, chainConfig, eth.engine, eth.shouldPreserve)
 	if err != nil {
 		return nil, err
 	}
 
-	eth.txPool = core.NewTxPool(node.Name(), config.TxPool, chainConfig, eth.blockchain)
+	eth.txPool = core.NewTxPool(node.Name(), metricCollector, config.TxPool, chainConfig, eth.blockchain)
 
-	eth.protocolManager = NewProtocolManager(eth, eth.EventFeed(),eth.blockchain, eth.txPool)
+	eth.protocolManager = NewProtocolManager(eth, metricCollector, eth.EventFeed(),eth.blockchain, eth.txPool)
 	eth.Server.Protocols = eth.Protocols()
 
 	eth.miner = miner.New(node.Name() ,eth, &config.Miner, chainConfig, eth.EventFeed(), eth.engine, eth.isLocalBlock)

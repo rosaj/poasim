@@ -1,6 +1,7 @@
 package config
 
 import (
+	"../metrics"
 	"../network/eth/params"
 	"math/big"
 	"time"
@@ -71,8 +72,11 @@ var LogConfig = logConfig {
 
 var MetricConfig  = metricConfig {
 
-	GroupFactor: 1,
+	GroupFactor: 60,
 
+	ExportType: PNG,
+
+	Metrics: metrics.TxPoolMetrics[:],
 }
 
 

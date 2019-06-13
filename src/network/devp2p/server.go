@@ -63,6 +63,7 @@ type Config struct {
 type Server struct {
 	// Config fields may not be modified while the server is running.
 	Config
+	IMetricCollector
 
 	node			INode
 
@@ -82,8 +83,9 @@ type Server struct {
 }
 
 
-func NewServer(node INode) *Server {
+func NewServer(node INode, metricCollector IMetricCollector) *Server {
 	srv :=  &Server{
+				IMetricCollector: metricCollector,
 				node: node,
 				peers: make(map[ID]*Peer),
 				handshakePeers: make(map[ID]*Peer),

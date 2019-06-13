@@ -89,8 +89,9 @@ const (
 	MissingParent       		= "missing parent"
 	ChainSplitDetected  		= "chain split detected"
 	ChainSplitDepth				= "chain split depth"
-
 )
+
+
 // CacheConfig contains the configuration values for the trie caching/pruning
 // that's resident in a blockchain.
 type CacheConfig struct {
@@ -117,7 +118,7 @@ type CacheConfig struct {
 // canonical chain.
 type BlockChain struct {
 	*godes.Runner
-	*MetricCollector
+	IMetricCollector
 
 	name 		string
 	chainConfig *params.ChainConfig // Chain & network configuration
@@ -167,7 +168,7 @@ type BlockChain struct {
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default Ethereum Validator and
 // Processor.
-func NewBlockChain(name string, db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, shouldPreserve func(block *types.Block) bool) (*BlockChain, error) {
+func NewBlockChain(name string, metricCollector IMetricCollector, db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, shouldPreserve func(block *types.Block) bool) (*BlockChain, error) {
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
 			TrieCleanLimit: 256,
@@ -184,7 +185,7 @@ func NewBlockChain(name string, db ethdb.Database, cacheConfig *CacheConfig, cha
 
 	bc := &BlockChain{
 		Runner:			&godes.Runner{},
-		MetricCollector:NewMetricCollector(),
+		IMetricCollector:metricCollector,
 		name:			name,
 		chainConfig:    chainConfig,
 		cacheConfig:    cacheConfig,
@@ -802,7 +803,7 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 			bc.log("Non contiguous receipt insert", "number", blockChain[i].Number(), "hash", blockChain[i].Hash(), "parent", blockChain[i].ParentHash(),
 				"prevnumber", blockChain[i-1].Number(), "prevhash", blockChain[i-1].Hash())
 
-			bc.Update(NonContiguousReceiptInsert, 1)
+			bc.Update(NonContiguousReceiptInsert)
 
 			return 0, fmt.Errorf("non contiguous insert: item %d is #%d [%x…], item %d is #%d [%x…] (parent [%x…])", i-1, blockChain[i-1].NumberU64(),
 				blockChain[i-1].Hash().Bytes()[:4], i, blockChain[i].NumberU64(), blockChain[i].Hash().Bytes()[:4], blockChain[i].ParentHash().Bytes()[:4])
@@ -1074,7 +1075,7 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 			bc.log("Non contiguous block insert", "number", block.Number(), "hash", block.Hash(),
 				"parent", block.ParentHash(), "prevnumber", prev.Number(), "prevhash", prev.Hash())
 
-			bc.Update(NonContiguousInsert, 1)
+			bc.Update(NonContiguousInsert)
 
 			return 0, fmt.Errorf("non contiguous insert: item %d is #%d [%x…], item %d is #%d [%x…] (parent [%x…])", i-1, prev.NumberU64(),
 				prev.Hash().Bytes()[:4], i, block.NumberU64(), block.Hash().Bytes()[:4], block.ParentHash().Bytes()[:4])
@@ -1240,7 +1241,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 				"elapsed", TimeSince(start),
 				"root", block.Root())
 
-			bc.Update(InsertNewBlock, 1)
+			bc.Update(InsertNewBlock)
 
 			coalescedLogs = append(coalescedLogs, logs...)
 			events = append(events, ChainEvent{block, block.Hash()})
@@ -1255,7 +1256,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 				"txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()),
 				"root", block.Root())
 
-			bc.Update(InsertForkedBlock, 1)
+			bc.Update(InsertForkedBlock)
 
 			events = append(events, ChainSideEvent{block})
 		}
@@ -1322,7 +1323,7 @@ func (bc *BlockChain) insertSidechain(block *types.Block, it *insertIterator) (i
 				// having verified the state of the previous blocks.
 				bc.log("Sidechain ghost-state attack detected", "number", block.NumberU64(), "sideroot", block.Root(), "canonroot", canonical.Root())
 
-				bc.Update(SidechainDetected, 1)
+				bc.Update(SidechainDetected)
 
 				// If someone legitimately side-mines blocks, they would still be imported as usual. However,
 				// we cannot risk writing unverified blocks to disk when they obviously target the pruning
@@ -1346,7 +1347,7 @@ func (bc *BlockChain) insertSidechain(block *types.Block, it *insertIterator) (i
 				"txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()),
 				"root", block.Root())
 
-			bc.Update(SidechainInject, 1)
+			bc.Update(SidechainInject)
 		}
 	}
 	// At this point, we've written all sidechain blocks to database. Loop ended
@@ -1373,7 +1374,7 @@ func (bc *BlockChain) insertSidechain(block *types.Block, it *insertIterator) (i
 		parent = bc.GetHeader(parent.ParentHash, parent.Number.Uint64()-1)
 	}
 	if parent == nil {
-		bc.Update(MissingParent, 1)
+		bc.Update(MissingParent)
 		return it.index, nil, nil, errors.New("missing parent")
 	}
 	// Import all the pruned blocks to make the state available
@@ -1498,8 +1499,8 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	if len(oldChain) > 0 && len(newChain) > 0 {
 		bc.log("Chain split detected", "number", commonBlock.Number(), "hash", commonBlock.Hash(),
 			"drop", len(oldChain), "dropfrom", oldChain[0].Hash(), "add", len(newChain), "addfrom", newChain[0].Hash())
-		bc.Update(ChainSplitDetected, 1)
-		bc.Update(ChainSplitDepth, len(oldChain))
+		bc.Update(ChainSplitDetected)
+		bc.UpdateWithValue(ChainSplitDepth, len(oldChain))
 	} else {
 		bc.log("Impossible reorg, please file an issue", "oldnum", oldBlock.Number(), "oldhash", oldBlock.Hash(), "newnum", newBlock.Number(), "newhash", newBlock.Hash())
 	}
@@ -1620,7 +1621,7 @@ Error: %v
 ##############################
 `, bc.chainConfig, block.Number(), block.Hash(), receiptString, err))
 
-	bc.Update(BadBlock, 1)
+	bc.Update(BadBlock)
 }
 
 // InsertHeaderChain attempts to insert the given header chain in to the local

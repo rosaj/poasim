@@ -14,13 +14,16 @@ import (
 	"strconv"
 )
 
+var(
+	OnlineNodes = "Online nodes"
+)
 
 var onlineCounter = 0
 
-var nodeStats = make(map[float64][]int)
+var nodeStats = NewMetricCollector()
 
-func GetNodeStats() map[float64][]int {
-	return nodeStats
+func GetNodeStats() map[float64]float64 {
+	return nodeStats.Collect(OnlineNodes)
 }
 
 func nodeCountChanged(arrival bool)  {
@@ -30,9 +33,7 @@ func nodeCountChanged(arrival bool)  {
 		onlineCounter -= 1
 	}
 
-	t := MetricConfig.GetTimeGroup()
-	nodeStats[t] = append(nodeStats[t], onlineCounter)
-
+	nodeStats.Set(OnlineNodes, onlineCounter)
 }
 
 type NodeConfig struct {
@@ -55,6 +56,7 @@ type NodeConfig struct {
 
 type Node struct {
 	*godes.Runner
+	IMetricCollector
 
 	*NodeConfig
 
@@ -97,6 +99,8 @@ func NewBootstrapNode(nodeConfig *NodeConfig) (n *Node) {
 func NewNode(nodeConfig *NodeConfig) (n* Node) {
 	n = new(Node)
 	n.Runner = &godes.Runner{}
+	n.IMetricCollector = NewMetricCollector()
+
 	n.NodeConfig = nodeConfig
 
 	n.name = string(strconv.Itoa(nodeCounter))
@@ -190,9 +194,6 @@ func (n *Node) GetConfig() *EthereumConfig {
 	return n.EthereumConfig
 }
 
-func (n *Node) GetTableStats() map[float64][]int {
-	return n.tab.GetTableStats()
-}
 
 func (n *Node) GetServerPeersStats() map[float64][]int  {
 	srv := n.Server()
@@ -218,7 +219,10 @@ func (n *Node) setOnline(online bool)  {
 	nodeCountChanged(online)
 }
 
+/*
+
 func (n *Node) MarkMessageSend(m IMessage){
+	n.Set(m.GetType(), 1)
 	n.addMsg(m, n.msgSent)
 }
 func (n *Node) MarkMessageReceived(m IMessage){
@@ -229,8 +233,8 @@ func (n *Node) addMsg(msg IMessage, msgMap map[string][]Msg)  {
 	t := MetricConfig.GetTimeGroup()
 	//TODO: msg size
 	msgMap[msg.GetType()] = append(msgMap[msg.GetType()], Msg{t, 1})
+
 }
-/*
 func (n *Node) GetMessagesSent(msgType string) int {
 	return n.msgSentCount[msgType]
 }
@@ -239,7 +243,6 @@ func (n *Node) GetMessagesReceived(msgType string) int {
 	return n.msgReceivedCount[msgType]
 }
 
- */
 
 func (n *Node) GetTotalMessagesSent() int {
 	return mapSum(n.msgSent)
@@ -265,14 +268,16 @@ func mapSum(data map[string][]Msg) int {
 	return sum
 }
 
+ */
+
 func (n *Node) startP2P()  {
-	n.tab, n.udp = discovery.NewUDP(n)
+	n.tab, n.udp = discovery.NewUDP(n, n)
 	n.log("P2P running")
 }
 
 func (n *Node) startServer()  {
 	var err error
-	n.server, err = eth.New(n) //devp2p.NewServer(n)
+	n.server, err = eth.New(n, n) //devp2p.NewServer(n)
 	if err != nil {
 		n.log(err)
 		return

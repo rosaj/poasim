@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"../../metrics"
 	. "../../common"
 	. "../../config"
 	. "../../network/message"
@@ -36,6 +37,8 @@ const (
 	seedMinTableTime    = 5 * time.Minute
 	seedCount           = 30
 	seedMaxAge          = 5 * 24 * time.Hour
+
+
 )
 
 type encPubkey [64]byte
@@ -50,6 +53,7 @@ func encodePubKey(key *ecdsa.PublicKey) encPubkey {
 
 
 type Table struct {
+	IMetricCollector
 	buckets [nBuckets]*bucket // index of known nodes by distance
 	nursery []INode           // bootstrap nodes
 	rand    *mrand.Rand       // source of randomness, periodically reseeded
@@ -62,8 +66,6 @@ type Table struct {
 	refreshDone godes.BooleanControl
 
 	tableRunners []*tableRunner
-
-	nodeStat map[float64][]int
 }
 
 // bucket contains nodes, ordered by their last activity. the entry
@@ -73,12 +75,12 @@ type bucket struct {
 	replacements []INode // recently seen nodes to be used if revalidation fails
 }
 
-func newTable(net *UDP, bootstrapNodes []INode) *Table {
+func newTable(metricCollector IMetricCollector, net *UDP, bootstrapNodes []INode) *Table {
 	tab := &Table{
+		IMetricCollector: metricCollector,
 		net:        net,
 		db:			net.db,
 		rand:       mrand.New(mrand.NewSource(0)),
-		nodeStat:	make(map[float64][]int),
 		livenessChecks:	make(map[INode]uint),
 		addedAt: make(map[INode]float64),
 	}
@@ -806,10 +808,5 @@ func (tab *Table) logNodes()  {
 			}
 		}
 	}
-	t := MetricConfig.GetTimeGroup()
-	tab.nodeStat[t] = append(tab.nodeStat[t], count)
-}
-
-func (tab *Table) GetTableStats()  map[float64][]int {
-	return tab.nodeStat
+	tab.IMetricCollector.Set(metrics.DiscoveryTable, count)
 }

@@ -35,8 +35,9 @@ const (
 
 var (
 	syncChallengeTimeout = 15 * time.Second // Time allowance for a node to reply to the sync progress challenge
+	EthPeers = "Eth peers"
+	MinedBlock = "Mined block"
 )
-
 
 
 // errIncompatibleConfig is returned if the requested protocols and configs are
@@ -49,6 +50,7 @@ func errResp(code errCode, format string, v ...interface{}) error {
 */
 
 type ProtocolManager struct {
+	IMetricCollector
 	srv IServer
 
 	networkID int
@@ -79,10 +81,11 @@ type ProtocolManager struct {
 
 // NewProtocolManager returns a new Ethereum sub protocol manager. The Ethereum sub protocol manages peers capable
 // with the Ethereum network.
-func NewProtocolManager(srv IServer, eventFeed 	*EventFeed, blockchain *core.BlockChain, pool txPool) *ProtocolManager {
+func NewProtocolManager(srv IServer,  metricCollector IMetricCollector, eventFeed 	*EventFeed, blockchain *core.BlockChain, pool txPool) *ProtocolManager {
 
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
+		IMetricCollector: metricCollector,
 		srv:	srv,
 		txpool: 	 pool, //core.NewTxPool(core.DefaultTxPoolConfig, params.RinkebyChainConfig, blockchain),
 		blockchain:  blockchain,
@@ -172,6 +175,7 @@ func (pm *ProtocolManager) removePeer(id ID) {
 		pm.log("Peer removal failed", "peer", peer, "err", err)
 	}
 
+	pm.Set(EthPeers, pm.PeerCount())
 }
 
 func (pm *ProtocolManager) Start() {
@@ -260,6 +264,7 @@ func (pm *ProtocolManager) handle(p *peer) {
 		pm.syncTransactions(p)
 		pm.synchroniseNewPeer(p)
 
+		pm.Set(EthPeers, pm.PeerCount())
 	})
 
 }
@@ -454,13 +459,6 @@ func (pm *ProtocolManager) HandleNewBlockHashesMsg(p *peer, m *Message) {
 			unknown = append(unknown, block)
 		}
 	}
-
-	/*
-	//TODO: tu dohvaca bodie od blokovi
-	for _, block := range unknown {
-		pm.fetcher.Notify(p.id, block.Hash, block.Number, time.Now(), p.RequestOneHeader, p.RequestBodies)
-	}
-	*/
 }
 
 // BroadcastBlock will either propagate a block to a subset of it's peers, or
@@ -491,6 +489,7 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 		for _, peer := range transfer {
 			peer.AsyncSendNewBlock(block, td)
 		}
+
 		pm.log("Propagated block", block.NumberU64(), "recipients", len(transfer), "duration", TimeSince(block.ReceivedAt))
 
 		return
@@ -526,9 +525,9 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 	}
 }
 
-// Mined broadcast loop
 func (pm *ProtocolManager) broadcastMinedBlock(data interface{}) {
 	if ev, ok := data.(core.NewMinedBlockEvent); ok {
+		pm.Update(MinedBlock)
 		pm.BroadcastBlock(ev.Block, true)  // First propagate block to peers
 		pm.BroadcastBlock(ev.Block, false) // Only then announce to the rest
 	}
@@ -541,11 +540,6 @@ func (pm *ProtocolManager) AddTxs(txs types.Transactions) []error {
 
 	pm.log("Added txs", len(txs), "pending", pm.PendingTxCount())
 	errors := pm.txpool.AddRemotes(txs)
-/*
-	for k, v := range errors {
-		pm.log( "Err", k, v)
-	}
-	*/
 
 	return errors
 }

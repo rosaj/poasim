@@ -3,15 +3,14 @@ package main
 import (
 	. "../common"
 	"../config"
+	"../export"
 	"../generate"
 	"../network"
 	"../network/eth"
 	"../network/eth/common"
 	"../network/eth/core"
 	"../network/protocol"
-	"../plot"
 	"../util"
-	"fmt"
 	"github.com/agoussia/godes"
 	"math"
 	"runtime"
@@ -333,22 +332,11 @@ func findNodeByAddress(nodes []*network.Node, address common.Address) *network.N
 }
 
 func showStats(nodes []*network.Node)  {
-
-	totalSent := 0
-	totalReceived := 0
-	for _, node := range nodes {
-		totalSent += node.GetTotalMessagesSent()
-		totalReceived += node.GetTotalMessagesReceived()
-	}
-
-	fmt.Println("Sent [sum:", totalSent,"avg:", totalSent/len(nodes), "]")
-	fmt.Println("Received [sum:", totalReceived,"avg:", totalReceived/len(nodes), "]")
-
-	plot.Stats(nodes)
+	export.Stats(nodes)
 }
 
 
 func main()  {
 	runSim()
-	//plot.Test()
+	//export.Test()
 }

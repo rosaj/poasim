@@ -4,14 +4,40 @@ import (
 	. "../config"
 )
 
-var GlobalCollector = newMetricCollector()
+/*
+type CalcFn  func(sum float64, count float64) float64
+
+var AvgFn = func(sum float64, count float64) float64 {
+	return sum / count
+}
+
+var SumFn = func(sum float64, count float64) float64 {
+	return sum
+}
+
+var statFns = make(map[string]func(sum float64, count float64) float64, 0)
+
+func RegisterStatFn(name string, fn CalcFn) string {
+	statFns[name] = fn
+	return ""
+}
+
+func statFn(name string)  CalcFn {
+	fn := statFns[name]
+	if fn != nil {
+		return fn
+	}
+	return SumFn
+}
+
+*/
 
 type MetricCollector struct {
 	metrics	map[string]map[float64][]int
 }
 
 func NewMetricCollector() *MetricCollector {
-	return GlobalCollector
+	return newMetricCollector()
 }
 func newMetricCollector() *MetricCollector {
 	return &MetricCollector{
@@ -32,9 +58,13 @@ func (mc *MetricCollector) ensureMetric(name string, numOfElems int)  {
 	}
 
 }
-func (mc *MetricCollector) Update(name string, value int) {
+func (mc *MetricCollector) UpdateWithValue(name string, value int) {
 	mc.ensureMetric(name, 1)
 	mc.metrics[name][getTime()][0] += value
+}
+
+func (mc *MetricCollector) Update(name string)  {
+	mc.UpdateWithValue(name, 1)
 }
 
 func (mc *MetricCollector) Set(name string, value int)  {
@@ -49,19 +79,29 @@ func (mc *MetricCollector) GetMetrics() map[string]map[float64][]int	{
 func (mc *MetricCollector) CollectMetrics() map[string]map[float64]float64  {
 	stats := make(map[string]map[float64]float64)
 
-	for key, val := range mc.metrics {
-		stats[key] = make(map[float64]float64, 0)
-
-		for k, v := range val {
-			sum := 0
-
-			for _, v1 := range v {
-				sum += v1
-			}
-
-			stats[key][k] = float64(sum)// / float64(len(v))
-		}
+	for key := range mc.metrics {
+		stats[key] = mc.Collect(key)
 	}
+
+	return stats
+}
+
+func (mc *MetricCollector) Collect(name string) map[float64]float64 {
+	stats := make(map[float64]float64, 0)
+
+
+	for time, count := range mc.metrics[name] {
+		sum := 0
+
+		for _, val := range count {
+			sum += val
+		}
+
+		stats[time] = float64(sum)/float64(len(count))
+		//stats[time] = statFn(name)(float64(sum), float64(len(count)))
+	}
+
+
 
 	return stats
 }

@@ -17,9 +17,10 @@
 package core
 
 import (
-	"../../../config"
-	. "../../../util"
 	. "../../../common"
+	"../../../config"
+	"../../../metrics"
+	. "../../../util"
 	"../../eth/common"
 	"../../eth/common/prque"
 	"../../eth/consensus"
@@ -33,7 +34,6 @@ import (
 	"math/big"
 	"sort"
 	"time"
-
 )
 
 const (
@@ -95,12 +95,7 @@ const (
 	TxStatusIncluded
 )
 
-const(
 
-	PendingTxs = "Pending txs"
-	QueuedTxs  = "Queued txs"
-
-)
 
 // blockChain provides the state of blockchain and current gas limit to do
 // some pre checks in tx pool and event subscribers.
@@ -202,7 +197,7 @@ func (config *TxPoolConfig) log(a ...interface{})  {
 // two states over time as they are received and processed.
 type TxPool struct {
 	*godes.Runner
-	*MetricCollector
+	IMetricCollector
 
 	name		 string
 
@@ -230,14 +225,14 @@ type TxPool struct {
 
 // NewTxPool creates a new transaction pool to gather, sort and filter inbound
 // transactions from the network.
-func NewTxPool(name string, config TxPoolConfig, chainconfig *params.ChainConfig, chain blockChain) *TxPool {
+func NewTxPool(name string, metricCollector IMetricCollector, config TxPoolConfig, chainconfig *params.ChainConfig, chain blockChain) *TxPool {
 	// Sanitize the input to ensure no vulnerable gas prices are set
 	config = (&config).sanitize()
 
 	// Create the transaction pool with its initial settings
 	pool := &TxPool{
 		Runner:		 &godes.Runner{},
-		MetricCollector:NewMetricCollector(),
+		IMetricCollector:metricCollector,
 		name: 		 name,
 		config:      config,
 		chainconfig: chainconfig,
@@ -495,8 +490,9 @@ func (pool *TxPool) stats() (int, int) {
 func (pool *TxPool) logStats() {
 	pending, queued := pool.stats()
 
-	pool.Set(QueuedTxs, queued)
-	pool.Set(PendingTxs, pending)
+	pool.Set(metrics.QueuedTxs, queued)
+	pool.Set(metrics.PendingTxs, pending)
+
 }
 
 // Content retrieves the data content of the transaction pool, returning all the

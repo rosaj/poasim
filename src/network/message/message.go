@@ -3,6 +3,7 @@ package message
 import (
 	. "../../common"
 	"../../config"
+	"../../metrics"
 	"../../util"
 	"errors"
 	"fmt"
@@ -18,34 +19,25 @@ var (
 )
 
 var (
-	PING		= "PING"
-	PONG		= "PONG"
-	FINDNODE	= "FINDNODE"
-	NEIGHBORS	= "NEIGHBORS"
+	PING		= metrics.PING
+	PONG		= metrics.PONG
+	FINDNODE	= metrics.FINDNODE
+	NEIGHBORS	= metrics.NEIGHBORS
 
 
-	DEVP2P_HANDSHAKE 	= "DEVP2P_HANDSHAKE"
-	DEVP2P_PING			= "DEVP2P_PING"
-	DEVP2P_PONG			= "DEVP2P_PONG"
+	DEVP2P_HANDSHAKE 	= metrics.DEVP2P_HANDSHAKE
+	DEVP2P_PING			= metrics.DEVP2P_PING
+	DEVP2P_PONG			= metrics.PONG
 
 
 	// eth protocol message codes
 
-	// Protocol messages belonging to eth/62
-	STATUS_MSG				= "StatusMsg"
-	NEW_BLOCK_HASHES_MSG	= "NewBlockHashesMsg"
-	TX_MSG					= "TxMsg"
-	GET_BLOCK_HEADERS_MSG	= "GetBlockHeadersMsg"
-	BLOCK_HEADERS_MSG		= "BlockHeadersMsg"
-	GET_BLOCK_BODIES_MSG	= "	GetBlockBodiesMsg"
-	BLOCK_BODIES_MSG		= "BlockBodiesMsg"
-	NEW_BLOCK_MSG			= "NewBlockMsg"
-
-	// Protocol messages belonging to eth/63
-	GET_NODE_DATA_MSG		= "GetNodeDataMsg"
-	NODE_DATA_MSG			= "NodeDataMsg"
-	GET_RECEIPTS_MSG		= "GetReceiptsMsg"
-	RECEIPTS_MSG			= "ReceiptsMsg"
+	STATUS_MSG				= metrics.STATUS_MSG
+	NEW_BLOCK_HASHES_MSG	= metrics.NEW_BLOCK_HASHES_MSG
+	TX_MSG					= metrics.TX_MSG
+	GET_BLOCK_HEADERS_MSG	= metrics.GET_BLOCK_HEADERS_MSG
+	BLOCK_HEADERS_MSG		= metrics.BLOCK_HEADERS_MSG
+	NEW_BLOCK_MSG			= metrics.NEW_BLOCK_MSG
 
 	)
 
@@ -74,7 +66,8 @@ func (m *Message) Run() {
 
 	m.logSent()
 
-	m.From.MarkMessageSend(m)
+//	m.From.MarkMessageSend(m)
+	m.From.Update(m.GetType())
 
 	m.latency = config.SimConfig.NextNetworkLatency()
 
@@ -87,7 +80,7 @@ func (m *Message) Run() {
 
 		m.responded()
 
-		m.To.MarkMessageReceived(m)
+//		m.To.MarkMessageReceived(m)
 	} else {
 		m.handleError(ErrMsgTimeout)
 		//m.Type = "RECIEVE_ERR"

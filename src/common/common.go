@@ -12,6 +12,8 @@ type ID [32]byte
 
 
 type INode interface {
+	IMetricCollector
+
 	Name() string
 	ID() ID
 	PublicKey() *ecdsa.PublicKey
@@ -22,8 +24,8 @@ type INode interface {
 	GetUDP() IUdp
 	Server() IServer
 
-	MarkMessageSend(m IMessage)
-	MarkMessageReceived(m IMessage)
+	//MarkMessageSend(m IMessage)
+//	MarkMessageReceived(m IMessage)
 
 
 	GetMaxPeers() int
@@ -54,7 +56,6 @@ type IDiscoveryTable interface {
 	ReadRandomNodes([]INode) int
 
 	SetOnline(online bool)
-	GetTableStats() map[float64][]int
 }
 
 type IServer interface {
@@ -108,4 +109,10 @@ type IProtocolManager interface {
 	AddTxs(txs types.Transactions) []error
 	PendingTxCount() int
 
+}
+
+type IMetricCollector interface {
+	Set(name string, value int)
+	Update(name string)
+	UpdateWithValue(name string, value int)
 }
