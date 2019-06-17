@@ -691,9 +691,7 @@ func (bc *BlockChain) Stop() {
 	}
 	// Unsubscribe all subscriptions registered from blockchain
 	//bc.scope.Close()
-	if bc.IsShedulled() {
-		godes.Interrupt(bc)
-	}
+	StopRunner(bc)
 
 	atomic.StoreInt32(&bc.procInterrupt, 1)
 
@@ -735,14 +733,12 @@ func (bc *BlockChain) Start()  {
 
 	atomic.StoreInt32(&bc.procInterrupt, 0)
 
-	if bc.IsShedulled() {
-		godes.Resume(bc, 0)
-	} else {
-		bc.update()
-	}
+	ResumeRunner(bc)
 
 }
-
+func (bc *BlockChain) String() string {
+	return fmt.Sprintf("Blockchain %s", bc.name)
+}
 func (bc *BlockChain) procFutureBlocks() {
 	blocks := make([]*types.Block, 0, bc.futureBlocks.Len())
 	for _, hash := range bc.futureBlocks.Keys() {

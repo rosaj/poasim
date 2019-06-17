@@ -195,14 +195,6 @@ func (n *Node) GetConfig() *EthereumConfig {
 }
 
 
-func (n *Node) GetServerPeersStats() map[float64][]int  {
-	srv := n.Server()
-	if srv != nil {
-		return n.Server().GetPeerStats()
-	}
-	return make(map[float64][]int, 0)
-}
-
 func (n *Node) setOnline(online bool)  {
 	n.online = online
 

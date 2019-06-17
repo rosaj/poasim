@@ -70,8 +70,6 @@ type IServer interface {
 	Self() INode
 
 	GetProtocolManager() IProtocolManager
-
-	GetPeerStats() map[float64][]int
 }
 
 type IPeer interface {

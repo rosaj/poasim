@@ -9,19 +9,19 @@ import (
 
 var SimConfig = config {
 
-	SimulationTime: (1 * 10 * time.Minute).Seconds(),
+	SimulationTime: (1 * 24 * time.Hour).Seconds(),
 
 	NodeCount: 6,
 
 	NodeStabilisationTime:  1 * time.Minute.Seconds(),
 
-	ChurnEnabled: false,
+	ChurnEnabled: true,
 
 	NodeArrivalDistr: NewNormalDistr((15*time.Second.Seconds()), 0),
 
-	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Minute).Seconds())),
+	NodeSessionTimeDistr: NewExpDistr(1 /( 24 * (time.Hour).Seconds())),
 
-	NodeIntersessionTimeDistr: NewExpDistr( 1 / (1 * time.Minute).Seconds()),
+	NodeIntersessionTimeDistr: NewExpDistr( 1 / (30 * time.Second).Seconds()),
 
 	NodeLifetimeDistr: NewExpDistr(1 / (11111116 * time.Minute.Seconds())),
 

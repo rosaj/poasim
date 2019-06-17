@@ -422,18 +422,13 @@ func (pool *TxPool) Stop() {
 
 	// Unsubscribe subscriptions registered from blockchain
 	//pool.chainHeadSub.Unsubscribe()
-	if pool.IsShedulled() {
-		godes.Interrupt(pool)
-	}
+
+	StopRunner(pool)
 	pool.log("Transaction pool stopped")
 }
 
 func (pool *TxPool) Start()  {
-	if pool.IsShedulled() {
-		godes.Resume(pool, 0)
-	} else {
-		pool.loop()
-	}
+	ResumeRunner(pool)
 }
 
 // SubscribeNewTxsEvent registers a subscription of NewTxsEvent and

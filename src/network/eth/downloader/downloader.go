@@ -191,6 +191,7 @@ func (d *Downloader) Synchronise(id ID, head common.Hash, td *big.Int) error {
 	default:
 		d.log("Synchronisation failed, retrying", "err", err)
 	}
+
 	return err
 }
 
@@ -251,6 +252,10 @@ func (d *Downloader) syncWithPeer(p Peer, hash common.Hash, td *big.Int) (err er
 
 	d.log("Mine height", localHeight, "peer height", height)
 
+	if localHeight >= height {
+		return nil
+	}
+
 	hashes := make([]common.Hash, 0)
 	headerHashes := make(map[common.Hash]*types.Header,0)
 
@@ -284,6 +289,9 @@ func (d *Downloader) syncWithPeer(p Peer, hash common.Hash, td *big.Int) (err er
 	for i, hash := range hashes {
 		result := results[hash]
 		header := headerHashes[hash]
+		if result == nil {
+			return errInvalidBody
+		}
 		blocks[i] = types.NewBlockWithHeader(header).WithBody(result.Transactions, result.Uncles)
 		d.log("Created block", blocks[i].NumberU64())
 	}

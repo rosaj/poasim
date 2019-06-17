@@ -175,12 +175,13 @@ func (config *config) NextNodeArrival() (interval float64) {
 
 func (config *config) NextNodeSessionTime() (interval float64) {
 	interval = clampToSimTime(config, config.NodeSessionTimeDistr)
-	//fmt.Println(interval)
+	//fmt.Println("Session time", time.Duration(interval) * time.Second)
 	return
 }
 
 func (config *config) NextNodeIntersessionTime() (interval float64)  {
 	interval = clampToSimTime(config, config.NodeIntersessionTimeDistr)
+	//fmt.Println("Intersession time", interval)
 	return
 }
 

@@ -2,6 +2,7 @@ package params
 
 import (
 	"../common"
+	"fmt"
 	"math/big"
 )
 
@@ -93,6 +94,23 @@ type ChainConfig struct {
 
 
 
+// String implements the fmt.Stringer interface.
+func (c *ChainConfig) String() string {
+	var engine interface{}
+	switch {
+	case c.Aura != nil:
+		engine = c.Aura
+	case c.Clique != nil:
+		engine = c.Clique
+	default:
+		engine = "unknown"
+	}
+	return fmt.Sprintf("{ChainID: %v  Engine: %v}",
+		c.ChainID,
+		engine,
+	)
+}
+
 
 // CliqueConfig is the consensus engine configs for proof-of-authority based sealing.
 type CliqueConfig struct {
@@ -102,13 +120,9 @@ type CliqueConfig struct {
 
 // String implements the stringer interface, returning the consensus engine details.
 func (c *CliqueConfig) String() string {
-	return "clique"
+	return fmt.Sprintf("clique period: %d", c.Period)
 }
 
-
-
-type Signature []byte
-type Signatures []Signature
 
 // AuraConfig is the consensus engine configs for proof-of-authority based sealing.
 type AuraConfig struct {
@@ -116,11 +130,10 @@ type AuraConfig struct {
 	Epoch       uint64           `json:"epoch"`       // Epoch length to reset votes and checkpoint
 	Authorities []common.Address `json:"authorities"` // list of addresses of authorities
 	Difficulty  *big.Int         `json:"difficulty"`  // Constant block difficulty
-	Signatures   Signatures           `json:"signatures"`
 }
 
 
 // String implements the stringer interface, returning the consensus engine details.
 func (c *AuraConfig) String() string {
-	return "aura"
+	return fmt.Sprintf("aura period: %d", c.Period)
 }

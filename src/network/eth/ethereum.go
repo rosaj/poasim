@@ -327,15 +327,8 @@ func (s *Ethereum) StartMining() error {
 }
 
 
-// StopMining terminates the miner, both at the consensus engine level as well as
-// at the block creation level.
-func (s *Ethereum) StopMining() {
-	// Stop the block creating itself
-	s.miner.Stop()
-}
-
 func (s *Ethereum) SetOnline(online bool)  {
-
+	//Print(s.Self().Name(), "ETHEREUM ONLINE", online)
 	if online {
 		s.Start()
 	} else {
@@ -388,10 +381,9 @@ func (s *Ethereum) Stop() {
 	s.protocolManager.Stop()
 
 	s.txPool.Stop()
-	s.miner.Stop()
+	s.miner.Close()
 
 	s.eventFeed.Stop()
-
 }
 
 func (s *Ethereum) log(a ...interface{})  {

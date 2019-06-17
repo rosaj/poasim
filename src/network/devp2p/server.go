@@ -3,6 +3,7 @@ package devp2p
 import (
 	. "../../common"
 	. "../../config"
+	"../../metrics"
 	. "../../util"
 
 	"errors"
@@ -17,7 +18,9 @@ const (
 	defaultMaxPendingPeers = 50
 	defaultDialRatio       = 3
 
+	PeerCount = metrics.DEVp2pPeers
 )
+
 
 var errServerStopped = errors.New("server stopped")
 
@@ -79,7 +82,6 @@ type Server struct {
 	refreshFunc 	func()
 	quitFunc		func()
 
-	peerStats		map[float64][]int
 }
 
 
@@ -89,7 +91,6 @@ func NewServer(node INode, metricCollector IMetricCollector) *Server {
 				node: node,
 				peers: make(map[ID]*Peer),
 				handshakePeers: make(map[ID]*Peer),
-				peerStats: make(map[float64][]int),
 
 				Config : Config {
 					MaxPeers: node.GetMaxPeers(),
@@ -477,12 +478,6 @@ func (srv *Server) log(a ...interface{})  {
 }
 
 func (srv *Server) logPeerStats()  {
+	srv.Set(PeerCount, len(srv.peers))
 
-	t := MetricConfig.GetTimeGroup()
-	srv.peerStats[t] = append(srv.peerStats[t], len(srv.peers))
-
-}
-
-func (srv *Server) GetPeerStats() map[float64][]int {
-	return srv.peerStats
 }

@@ -27,6 +27,7 @@ import (
 	"../core/types"
 	"../params"
 	"errors"
+	"fmt"
 	"github.com/agoussia/godes"
 	mapset "github.com/deckarep/golang-set"
 	"math/big"
@@ -133,13 +134,6 @@ type worker struct {
 
 	// Subscriptions
 	mux          *EventFeed
-	txsCh        chan core.NewTxsEvent
-	chainSideCh  chan core.ChainSideEvent
-
-	// Channels
-	newWorkCh          chan *newWorkReq
-	resultCh           chan *types.Block
-	exitCh             chan struct{}
 
 	current      *environment                 // An environment for current running cycle.
 	localUncles  map[common.Hash]*types.Block // A set of side blocks generated locally as the possible uncle blocks.
@@ -188,11 +182,6 @@ func newWorker(name string, config *Config, chainConfig *params.ChainConfig, eng
 		remoteUncles:       make(map[common.Hash]*types.Block),
 		unconfirmed:        newUnconfirmedBlocks(eth.BlockChain(), miningLogAtDepth),
 		pendingTasks:       make(map[common.Hash]*task),
-		txsCh:              make(chan core.NewTxsEvent, txChanSize),
-		chainSideCh:        make(chan core.ChainSideEvent, chainSideChanSize),
-		newWorkCh:          make(chan *newWorkReq),
-		resultCh:           make(chan *types.Block, resultQueueSize),
-		exitCh:             make(chan struct{}),
 	}
 	// Subscribe NewTxsEvent for tx pool
 	eth.TxPool().SubscribeNewTxsEvent(worker.handleTxEvent)
@@ -251,6 +240,7 @@ func (w *worker) pendingBlock() *types.Block {
 // start sets the running status as 1 and triggers new work submitting.
 func (w *worker) start() {
 	atomic.StoreInt32(&w.running, 1)
+	ResumeRunner(w)
 	w.startWork()
 }
 
@@ -267,9 +257,9 @@ func (w *worker) isRunning() bool {
 // close terminates all background threads maintained by the worker.
 // Note the worker does not support being closed multiple times.
 func (w *worker) close() {
-	close(w.exitCh)
+	StopRunner(w)
+	w.interruptPrevTask()
 }
-
 
 
 func (w *worker) clearPending(number uint64) {
@@ -481,6 +471,17 @@ func (w *worker) postTask(task *task)  {
 	godes.AddRunner(task)
 
 }
+
+func (w *worker) interruptPrevTask()  {
+	// Interrupt previous sealing operation
+	if w.prevTask != nil {
+		if w.prevTask.IsShedulled(){
+			godes.Interrupt(w.prevTask)
+		}
+		w.prevTask = nil
+	}
+
+}
 func (task *task) Run()  {
 	w := task.worker
 	w.log("Running task for block", task.block.NumberU64())
@@ -491,16 +492,9 @@ func (task *task) Run()  {
 		w.log("Resubmiting task for block", task.block.NumberU64())
 		return
 	}
-	// Interrupt previous sealing operation
-	if w.prevTask != nil {
-		if w.prevTask.IsShedulled(){
-			godes.Interrupt(w.prevTask)
-		}
-		w.prevTask = nil
-	}
-
+	w.interruptPrevTask()
 	w.prev = sealHash
-
+	w.prevTask = task
 
 	w.pendingTasks[w.engine.SealHash(task.block.Header())] = task
 
@@ -957,10 +951,13 @@ func (w *worker)  commit(uncles []*types.Header,  update bool, start uint64) err
 	return nil
 }
 
+func (w *worker) String() string {
+	return fmt.Sprintf("Worker %s", w.name)
+}
 func (w *worker) log(a ...interface{}) {
 
 	if LogConfig.LogWorker {
-		Log("Worker: ", w.name, a)
+		Log(w, a)
 	}
 
 }

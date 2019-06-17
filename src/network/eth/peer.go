@@ -107,7 +107,6 @@ func (p *peer) broadcast() {
 		p.Log("Peer already broadcasting skipping broadcast")
 		return
 	}
-	p.Log("Broadcasting")
 	select {
 	case txs := <-p.queuedTxs:
 
@@ -190,6 +189,7 @@ func (p *peer) NewMsg(to INode, msgType string, content interface{}, responseTo 
 
 
 func (p *peer) send(msgType string, content interface{}, handler func(m *Message), listener func(err error))  {
+	p.Log("Broadcasting", msgType)
 
 	p.broadcasting = true
 
@@ -656,3 +656,6 @@ func (ps *peerSet) Close() {
 	ps.closed = true
 }
 
+func (ps *peerSet) Open()  {
+	ps.closed = false
+}

@@ -4,7 +4,6 @@ import (
 	. "../common"
 	"../config"
 	"../export"
-	"../generate"
 	"../network"
 	"../network/eth"
 	"../network/eth/common"
@@ -120,7 +119,7 @@ func runSim(){
 	godes.Advance(config.SimConfig.NodeStabilisationTime)
 
 
-	generate.AsyncTxs(nodes[:config.SimConfig.NodeCount], 1000, 600, 0.08)
+	//generate.AsyncTxs(nodes[:config.SimConfig.NodeCount], 1000, 600, 0.08)
 
 	//TODO: metrike npr. blockchain broj insert-a, forka, sidechaina, txs received etc
 
@@ -301,7 +300,7 @@ func waitForEnd(nodes []*network.Node)  {
 		ob := nodes[i].Server().(*eth.Ethereum).BlockChain().CurrentBlock()
 		util.Print(i, ob.NumberU64())
 	}
-
+	size := common.StorageSize(0)
 	total := 0
 	for i := max;i >= 1 ; i-=1  {
 		block := bc.GetBlockByNumber(uint64(i))
@@ -313,6 +312,9 @@ func waitForEnd(nodes []*network.Node)  {
 			signer := findNodeByAddress(nodes, signAddr)
 
 			util.Print(block.Number(), "tx count", block.Transactions().Len(), "signer", signer)
+			size += block.Size()
+			size += block.Header().Size()
+
 			total += len(block.Transactions())
 		} else {
 			util.Print("block", i, "je nil")
@@ -320,6 +322,7 @@ func waitForEnd(nodes []*network.Node)  {
 	}
 
 	util.Print("Total num of txs", total)
+	util.Print("BC size", size)
 }
 
 func findNodeByAddress(nodes []*network.Node, address common.Address) *network.Node {

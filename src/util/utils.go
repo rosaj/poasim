@@ -53,3 +53,33 @@ type tempRunner struct {
 func (t *tempRunner) Run()  {
 	t.runFn()
 }
+
+
+
+
+// Nazalost godes ne omogucava provjeru da li je runner zaustavlje
+// sto bi bila i trivijalna provjera jer se radi samo o stanju state
+
+var interruptedRunners = make(map[stoppableRunner]float64, 0)
+
+type stoppableRunner interface {
+	godes.RunnerInterface
+	IsShedulled() bool
+}
+
+func StopRunner(ri stoppableRunner)  {
+
+	if ri.IsShedulled() {
+		interruptedRunners[ri] = godes.GetSystemTime()
+		godes.Interrupt(ri)
+	}
+}
+
+func ResumeRunner(ri stoppableRunner)  {
+
+	if interrupTime := interruptedRunners[ri]; interrupTime != 0 {
+		interruptedRunners[ri] = 0
+		godes.Resume(ri, godes.GetSystemTime() - interrupTime)
+	}
+
+}

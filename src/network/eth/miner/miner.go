@@ -62,7 +62,6 @@ type Miner struct {
 	coinbase common.Address
 	eth      Backend
 	engine   consensus.Engine
-	exitCh   chan struct{}
 
 	canStart    int32 // can start indicates whether we can start the mining operation
 	shouldStart int32 // should start indicates whether we should start after sync
@@ -74,7 +73,6 @@ func New(name string, eth Backend, config *Config, chainConfig *params.ChainConf
 		eth:      eth,
 		mux:      mux,
 		engine:   engine,
-		exitCh:   make(chan struct{}),
 		worker:   newWorker(name, config, chainConfig, engine, eth, mux, isLocalBlock),
 		canStart: 1,
 		shouldStart: 1,
@@ -146,7 +144,6 @@ func (self *Miner) Stop() {
 
 func (self *Miner) Close() {
 	self.worker.close()
-	close(self.exitCh)
 }
 
 func (self *Miner) Mining() bool {

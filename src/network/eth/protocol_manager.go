@@ -180,6 +180,9 @@ func (pm *ProtocolManager) removePeer(id ID) {
 
 func (pm *ProtocolManager) Start() {
 
+
+	pm.peers.Open()
+
 	// broadcast transactions
 	pm.txpool.SubscribeNewTxsEvent(func(txEvent core.NewTxsEvent) {
 		pm.BroadcastTxs(txEvent.Txs)
@@ -212,6 +215,7 @@ func (pm *ProtocolManager) Stop() {
 	pm.log("Stopping Ethereum protocol")
 
 	pm.txSyncManager.stop()
+
 
 	// Disconnect existing sessions.
 	// This also closes the gate for any new registrations on the peer set.
@@ -438,7 +442,9 @@ func (pm *ProtocolManager) HandleNewBlockMsg(p *peer, m *Message)  {
 		// scenario should easily be covered by the fetcher.
 		currentBlock := pm.blockchain.CurrentBlock()
 		if trueTD.Cmp(pm.blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64())) > 0 {
-			pm.synchronise(p)
+			StartNewRunner(func() {
+				pm.synchronise(p)
+			})
 		}
 	}
 }

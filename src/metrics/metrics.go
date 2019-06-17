@@ -51,10 +51,15 @@ var DiscoveryMetrics = [...]string{
 	DiscoveryTable,
 }
 
+const DEVp2pPeers = "DEVp2p peers"
+
+
+
 var DevP2PMetrics = [...]string{
 	DEVP2P_PING,
 	DEVP2P_PONG,
 	DEVP2P_HANDSHAKE,
+	DEVp2pPeers,
 }
 
 const 	(
