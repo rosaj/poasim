@@ -9,7 +9,7 @@ import (
 
 var SimConfig = config {
 
-	SimulationTime: (1 * 24 * time.Hour).Seconds(),
+	SimulationTime: (1 * 6 * time.Hour).Seconds(),
 
 	NodeCount: 12,
 
@@ -78,8 +78,9 @@ var MetricConfig  = metricConfig {
 
 	ExportType: PNG,
 
-	Metrics: append (make([]string, 0), metrics.GasLimit),
-//	Metrics: metrics.TxPoolMetrics[:],
+//	Metrics: append (make([]string, 0), metrics.GasLimit),
+	////	Metrics: metrics.TxPoolMetrics[:],
+	Metrics: metrics.AllTxPoolMetrics[:],
 }
 
 

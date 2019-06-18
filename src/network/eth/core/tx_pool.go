@@ -787,19 +787,31 @@ func (pool *TxPool) addTxs(txs []*types.Transaction, local bool) []error {
 		types.Sender(pool.signer, tx)
 	}
 
-	err := pool.addTxsLocked(txs, local)
-	pool.logErrors(err)
-	return err
+	errs := pool.addTxsLocked(txs, local)
+	pool.logErrors(errs)
+	return errs
 }
 
 func (pool *TxPool) logErrors(errors []error)  {
+	count := 0
+
 	if errors != nil && len(errors) > 0 {
-		pool.UpdateWithValue(metrics.TxPoolErrors, len(errors))
+
 		for _, err := range errors {
-			pool.Update(err.Error())
+			if err != nil  {
+				pool.Update(err.Error())
+				count += 1
+			}
 		}
+
+	}
+
+
+	if count > 0  {
+		pool.UpdateWithValue(metrics.TxPoolErrors, count)
 	}
 }
+
 
 // addTxsLocked attempts to queue a batch of transactions if they are valid,
 // whilst assuming the transaction pool lock is already held.
