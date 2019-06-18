@@ -107,8 +107,14 @@ func AsyncTxs(broadcastNodes []*network.Node, actorCount int, txCount int, step 
 
 
 func randomBroadcast(broadcastNodes []*network.Node, txs types.Transactions) int {
-	//TODO: IS ONLINE
+
+
 	index := rand.Intn(len(broadcastNodes))
+
+	for !broadcastNodes[index].IsOnline() {
+		index = rand.Intn(len(broadcastNodes))
+	}
+
 	errors := broadcastNodes[index].Server().GetProtocolManager().AddTxs(txs)
 	//util.Log("sending to ", broadcastNodes[index].Name())
 	errCount := 0
