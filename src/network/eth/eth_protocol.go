@@ -143,6 +143,11 @@ type newBlockData struct {
 	TD    *big.Int
 }
 
+func (n newBlockData) Size() common.StorageSize {
+	return n.Block.Size()
+}
+
+
 // blockBody represents the data content of a single block.
 type blockBody struct {
 	Transactions []*types.Transaction // Transactions contained within a block

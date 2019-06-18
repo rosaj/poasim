@@ -4,6 +4,7 @@ import (
 	. "../common"
 	"../config"
 	"../export"
+	"../generate"
 	"../network"
 	"../network/eth"
 	"../network/eth/common"
@@ -119,7 +120,7 @@ func runSim(){
 	godes.Advance(config.SimConfig.NodeStabilisationTime)
 
 
-	//generate.AsyncTxs(nodes[:config.SimConfig.NodeCount], 1000, 600, 0.08)
+	generate.AsyncTxs(nodes[:config.SimConfig.NodeCount], 1000, 600, 0.08)
 
 	//TODO: metrike npr. blockchain broj insert-a, forka, sidechaina, txs received etc
 

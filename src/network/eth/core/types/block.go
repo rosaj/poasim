@@ -122,6 +122,21 @@ type Body struct {
 	Uncles       []*Header
 }
 
+func (b *Body) Size() common.StorageSize {
+	size := common.StorageSize(0)
+
+	if len(b.Transactions) > 0 {
+		size +=	Transactions(b.Transactions).Size()
+	}
+
+	if len(b.Uncles) > 0 {
+		for _, uncle := range b.Uncles {
+			size += uncle.Size()
+		}
+	}
+
+	return size
+}
 // Block represents an entire block in the Ethereum blockchain.
 type Block struct {
 	header       *Header

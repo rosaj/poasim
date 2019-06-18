@@ -275,6 +275,16 @@ func (s Transactions) GetRlp(i int) []byte {
 	return enc
 }
 
+func (s Transactions) Size() common.StorageSize {
+	size := common.StorageSize(0)
+
+	for _, txn := range s {
+		size += txn.Size()
+	}
+
+	return size
+}
+
 // TxDifference returns a new set which is the difference between a and b.
 func TxDifference(a, b Transactions) Transactions {
 	keep := make(Transactions, 0, len(a))

@@ -5,6 +5,7 @@ import (
 	"../../config"
 	"../../metrics"
 	"../../util"
+	"../eth/common"
 	"errors"
 	"fmt"
 	"github.com/agoussia/godes"
@@ -41,7 +42,9 @@ var (
 
 	)
 
-
+type storageContent interface {
+	Size() common.StorageSize
+}
 
 type Message struct {
 	godes.Runner
@@ -68,8 +71,6 @@ func (m *Message) Run() {
 
 //	m.From.MarkMessageSend(m)
 	m.From.Update(m.GetType())
-
-	m.latency = config.SimConfig.NextNetworkLatency()
 
 	godes.Advance(m.latency)
 
@@ -115,7 +116,36 @@ func NewMessage(
 		responseTimeout: responseTimeout,
 	}
 
+
+	m.latency = CalculateLatency(content)
+
 	return
+}
+
+var NetworkSpeed = 1024.0 * 400
+
+func CalculateLatency(content interface{}) float64 {
+	//latency := config.SimConfig.NextNetworkLatency()
+	size := common.StorageSize(0)
+	if storage, ok := content.(storageContent); ok {
+		size = storage.Size()
+	//	latency += float64(storage.Size())/NetworkSpeed
+		//util.Print(util.ToDuration(latency), latency, storage.Size(), float64(storage.Size())/NetworkSpeed)
+	}
+	return CalculateSizeLatency(size)
+//	return latency
+}
+
+func CalculateSizeLatency(size common.StorageSize) float64 {
+	latency := config.SimConfig.NextNetworkLatency()
+
+	if size > 0 {
+		latency += float64(size)/NetworkSpeed
+	}
+
+	//util.Print("CalcLat", size, util.ToDuration(latency), latency)
+
+	return latency
 }
 
 func (m *Message) Send() {

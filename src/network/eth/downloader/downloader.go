@@ -1,13 +1,14 @@
 package downloader
 
 import (
-	"../params"
 	. "../../../common"
 	. "../../../config"
+	"../../../network/message"
 	. "../../../util"
 	"../common"
 	"../core/types"
 	. "../event_feed"
+	"../params"
 	"errors"
 	"github.com/agoussia/godes"
 	"math/big"
@@ -266,6 +267,9 @@ func (d *Downloader) syncWithPeer(p Peer, hash common.Hash, td *big.Int) (err er
 		if err != nil {
 			return err
 		}
+
+		godes.Advance(message.CalculateSizeLatency(calcHeadersSize(headers)))
+
 		d.log("Inserting headers", len(headers))
 
 		d.blockchain.InsertHeaderChain(headers, fsHeaderCheckFrequency)
@@ -284,6 +288,8 @@ func (d *Downloader) syncWithPeer(p Peer, hash common.Hash, td *big.Int) (err er
 		return err
 	}
 
+	godes.Advance(message.CalculateSizeLatency(calcBodysSize(results)))
+
 	blocks := make([]*types.Block, len(results))
 
 	for i, hash := range hashes {
@@ -295,16 +301,7 @@ func (d *Downloader) syncWithPeer(p Peer, hash common.Hash, td *big.Int) (err er
 		blocks[i] = types.NewBlockWithHeader(header).WithBody(result.Transactions, result.Uncles)
 		d.log("Created block", blocks[i].NumberU64())
 	}
-	/*
-	i := 0
-	for hash, result := range results {
-		header := headerHashes[hash]
-		blocks[i] = types.NewBlockWithHeader(header).WithBody(result.Transactions, result.Uncles)
-		d.log("Created block", blocks[i].NumberU64())
-		i+=1
-	}
 
-	 */
 	if index, err := d.blockchain.InsertChain(blocks); err != nil {
 		if index < len(results) {
 			d.log("Downloaded item processing failed", "number", blocks[index].Header().Number, "err", err)
@@ -322,6 +319,24 @@ func (d *Downloader) syncWithPeer(p Peer, hash common.Hash, td *big.Int) (err er
 	return nil
 }
 
+func calcHeadersSize(headers []*types.Header) common.StorageSize {
+	size := common.StorageSize(0)
+	for _, header := range headers {
+		size += header.Size()
+	}
+
+	return size
+}
+
+func calcBodysSize(bodys map[common.Hash]*types.Body) common.StorageSize  {
+	size := common.StorageSize(0)
+
+	for _, body := range bodys {
+		size += body.Size()
+	}
+
+	return size
+}
 
 // fetchHeight retrieves the head header of the remote peer to aid in estimating
 // the total time a pending synchronisation would take.
