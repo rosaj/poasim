@@ -28,7 +28,7 @@ var (
 
 	DEVP2P_HANDSHAKE 	= metrics.DEVP2P_HANDSHAKE
 	DEVP2P_PING			= metrics.DEVP2P_PING
-	DEVP2P_PONG			= metrics.PONG
+	DEVP2P_PONG			= metrics.DEVP2P_PONG
 
 
 	// eth protocol message codes

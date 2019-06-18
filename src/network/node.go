@@ -3,6 +3,7 @@ package network
 import (
 	. "../common"
 	. "../config"
+	"../metrics"
 	"../network/devp2p"
 	"../network/discovery"
 	"../network/eth"
@@ -16,12 +17,12 @@ import (
 )
 
 var(
-	OnlineNodes = "Online nodes"
+	OnlineNodes = metrics.OnlineNodes
 )
 
 var onlineCounter = 0
 
-var nodeStats = NewMetricCollector()
+var nodeStats = GlobalMetricCollector
 
 func GetNodeStats() map[float64]float64 {
 	return nodeStats.Collect(OnlineNodes)

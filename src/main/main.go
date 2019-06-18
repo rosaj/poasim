@@ -129,9 +129,7 @@ func runSim(){
 	}
 	//TODO: metrike npr. blockchain broj insert-a, forka, sidechaina, txs received etc
 
-
 	waitForEnd(nodes)
-
 }
 
 func progressSimToEnd()  {
@@ -159,6 +157,7 @@ func progressSimToEnd()  {
 func waitForEnd(nodes []*network.Node)  {
 
 	progressSimToEnd()
+
 
 	if godes.GetSystemTime() > config.SimConfig.SimulationTime {
 		config.SimConfig.SimulationTime = godes.GetSystemTime()

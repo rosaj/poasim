@@ -3,6 +3,7 @@ package eth
 import (
 	. "../../common"
 	. "../../config"
+	"../../metrics"
 	. "../../util"
 	"../eth/common"
 	"../eth/core"
@@ -35,8 +36,10 @@ const (
 
 var (
 	syncChallengeTimeout = 15 * time.Second // Time allowance for a node to reply to the sync progress challenge
-	EthPeers = "Eth peers"
-	MinedBlock = "Mined block"
+	EthPeers 					= metrics.EthPeers
+	MinedBlock 					= metrics.MinedBlock
+	TxsPerBlock					= metrics.TxsPerBlock
+
 )
 
 
@@ -175,7 +178,7 @@ func (pm *ProtocolManager) removePeer(id ID) {
 		pm.log("Peer removal failed", "peer", peer, "err", err)
 	}
 
-	pm.Set(EthPeers, pm.PeerCount())
+	pm.logPeerStats()
 }
 
 func (pm *ProtocolManager) Start() {
@@ -268,9 +271,13 @@ func (pm *ProtocolManager) handle(p *peer) {
 		pm.syncTransactions(p)
 		pm.synchroniseNewPeer(p)
 
-		pm.Set(EthPeers, pm.PeerCount())
+		pm.logPeerStats()
 	})
 
+}
+
+func (pm *ProtocolManager) logPeerStats()  {
+	pm.Set(EthPeers, pm.PeerCount())
 }
 
 func (pm *ProtocolManager) getBlockBodies(hashes []common.Hash) map[common.Hash]*types.Body  {
@@ -534,6 +541,7 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 func (pm *ProtocolManager) broadcastMinedBlock(data interface{}) {
 	if ev, ok := data.(core.NewMinedBlockEvent); ok {
 		pm.Update(MinedBlock)
+		pm.Set(TxsPerBlock, ev.Block.Transactions().Len())
 		pm.BroadcastBlock(ev.Block, true)  // First propagate block to peers
 		pm.BroadcastBlock(ev.Block, false) // Only then announce to the rest
 	}
@@ -545,6 +553,9 @@ func (pm *ProtocolManager) PendingTxCount() int  {
 func (pm *ProtocolManager) AddTxs(txs types.Transactions) []error {
 
 	pm.log("Added txs", len(txs), "pending", pm.PendingTxCount())
+
+	pm.Update(metrics.TxsArrival)
+
 	errors := pm.txpool.AddRemotes(txs)
 
 	return errors

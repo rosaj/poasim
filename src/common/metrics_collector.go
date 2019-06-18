@@ -32,6 +32,8 @@ func statFn(name string)  CalcFn {
 
 */
 
+var GlobalMetricCollector = NewMetricCollector()
+
 type MetricCollector struct {
 	metrics	map[string]map[float64][]int
 }

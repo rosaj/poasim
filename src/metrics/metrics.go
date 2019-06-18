@@ -12,6 +12,7 @@ const (
 	ChainSplitDetected  		= "chain split detected"
 	ChainSplitDepth				= "chain split depth"
 	GasLimit					= "gas limit"
+	TxsPerBlock					= "txs per block"
 )
 
 
@@ -27,6 +28,8 @@ var	BlockchainMetrics = [...]string{
 	ChainSplitDetected,
 	ChainSplitDepth,
 	GasLimit,
+	TxsPerBlock,
+
 }
 
 
@@ -34,19 +37,22 @@ const(
 
 	PendingTxs = "Pending txs"
 	QueuedTxs  = "Queued txs"
+	TxsArrival = "Txs arrival"
 
 )
 var TxPoolMetrics = [...]string {
 	PendingTxs,
 	QueuedTxs,
+	TxsArrival,
 }
 
 const (
 	TxPoolErrors 			= "Tx pool errors"
 	TransactionUnderpriced 	= "transaction underpriced"
 	InsufficientFunds		= "insufficient funds for gas * price + value"
-	NonceTooLow				= "nonce oto low"
+	NonceTooLow				= "nonce too low"
 	ExceedsGasLimit 		= "exceeds block gas limit"
+	KnownTransaction		= "known transaction"
 )
 
 var TxPoolErrorMetrics = [...]string {
@@ -55,6 +61,7 @@ var TxPoolErrorMetrics = [...]string {
 	InsufficientFunds,
 	NonceTooLow,
 	ExceedsGasLimit,
+	KnownTransaction,
 }
 
 var AllTxPoolMetrics = append(TxPoolMetrics[:], TxPoolErrorMetrics[:]...)
@@ -62,6 +69,8 @@ var AllTxPoolMetrics = append(TxPoolMetrics[:], TxPoolErrorMetrics[:]...)
 
 var	(
 	DiscoveryTable		= "DiscoveryTable"
+	OnlineNodes 		= "Online nodes"
+
 )
 
 var DiscoveryMetrics = [...]string{
@@ -70,6 +79,8 @@ var DiscoveryMetrics = [...]string{
 	FINDNODE,
 	NEIGHBORS,
 	DiscoveryTable,
+	OnlineNodes,
+
 }
 
 const DEVp2pPeers = "DEVp2p peers"
@@ -120,6 +131,16 @@ var (
 	BLOCK_HEADERS_MSG		= "BlockHeadersMsg"
 	NEW_BLOCK_MSG			= "NewBlockMsg"
 
-
 )
+
+
+var AllMetrics = append(AllTxPoolMetrics[:],
+						append(BlockchainMetrics[:],
+							append(EthProtoMetrics[:],
+								append(DevP2PMetrics[:], DiscoveryMetrics[:]...
+									)...
+								)...
+							)...
+						)
+
 

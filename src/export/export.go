@@ -70,6 +70,7 @@ func Stats(nodes []*Node)  {
 		}
 	}
 
+
 	ptss := make(map[string]plotter.XYs)
 
 	if all[OnlineNodes] != nil {
@@ -80,15 +81,20 @@ func Stats(nodes []*Node)  {
 
 	for key, value := range all {
 
-		vals := make(map[float64]float64, len(value))
+		if config.MetricConfig.CollectType == config.Average {
 
-		for v, val := range value {
-			vals[v] = val / float64(count[key][v])
+			vals := make(map[float64]float64, len(value))
+
+			for v, val := range value {
+				vals[v] = val / float64(count[key][v])
+			}
+
+			addPoints(vals, key, ptss)
+
+		} else if config.MetricConfig.CollectType == config.Cumulative {
+
+			addPoints(value, key, ptss)
 		}
-		addPoints(vals, key, ptss)
-
-//		addPoints(value, key, ptss)
-
 	}
 
 
@@ -185,31 +191,41 @@ func csvExport(data map[string]plotter.XYs, name string) error {
 	if err := writer.Write(headers); err != nil {
 		return err
 	}
+	groupFactor := config.MetricConfig.GroupFactor
 
-	rows := make([][]string, 0)
+	rows := make([][]string, int(config.SimConfig.SimulationTime/groupFactor)+1)
 
-	for _, v := range data["ALL"] {
+	for i := range rows {
 
 		row := make([]string, 0)
-		row = append(row, strconv.Itoa(int(v.X)),util.ToDuration(v.X * config.MetricConfig.GroupFactor).String())
-		rows = append(rows, row)
+
+		x := float64(i) * groupFactor
+
+		row = append(row, strconv.Itoa(int(x)), util.ToDuration(x).String())
+
+		rows[i] = row
 	}
 
-	all := data["ALL"]
-
 	for _, key := range keys {
-		value := data[key]
-		i := 0
-		for _, xy := range value {
-			for all[i].X < xy.X {
+		vals := data[key]
+
+		ind := 0
+		for i := range rows {
+
+			x := float64(i) * groupFactor
+			// ako do kraja treba popunit sa praznim mjestima ili
+			// ako je izmedu x-eva praznega mjesta
+			// onda pisi prazna mjesta
+			if  ind >= len(vals) || x < vals[ind].X  {
 				rows[i] = append(rows[i], "")
-				i++
+				continue
 			}
-			rows[i] = append(rows[i], strconv.Itoa(int(xy.Y)))
-			i++
+			rows[i] = append(rows[i],  strconv.Itoa(int(vals[ind].Y)))
+			ind++
 		}
 
 	}
+
 
 	for _, row := range rows {
 
@@ -218,132 +234,11 @@ func csvExport(data map[string]plotter.XYs, name string) error {
 		}
 	}
 
-/*
-	for _, key := range keys {
-		value := data[key]
-
-		row := make([]string, 0)
-		row = append(row, "Type")
-
-		vals := make([]string, 0)
-		vals = append(vals, key)
-
-		for _, v := range value {
-			row = append(row, util.ToDuration(v.X * config.MetricConfig.GroupFactor).String())
-			vals = append(vals, strconv.Itoa(int(v.Y)))
-		}
-
-		if err := writer.Write(row); err != nil {
-			return err
-		}
-		if err := writer.Write(vals); err != nil {
-			return err
-		}
-
-
-	}
-
-*/
-
-
-
+//	util.Print(data)
 	return nil
 }
 
 
-
-/*
-func calcMeanPoints(nodes []*Node, dataFunc func(n *Node) map[float64][]int, key string, ptss map[string]plotter.XYs) {
-
-
-	stats := make(map[float64][]float64)
-
-	for _, node := range nodes {
-		dataStats := dataFunc(node)
-		for k, v := range dataStats {
-			sum := 0
-			for _, intVal := range v {
-				sum += intVal
-			}
-			stats[k] = append(stats[k], float64(sum/len(v)))
-		}
-	}
-
-
-	vals := make(map[float64]float64)
-	for k,v := range stats {
-		vals[k] = godes.Mean(v)
-	}
-
-	addPoints(vals, key, ptss)
-
-}*/
-/*
-	all := make(map[string][]Msg)
-
-	for _, node := range nodes {
-		sent := node.GetMessagesSent()
-		for key, val := range sent {
-			all[key] = append(all[key], val...)
-			all["ALL"] = append(all["ALL"], val...)
-		}
-	}
-
-	fmt.Println("All msg gathered")
-
-
-	for key, value := range all {
-
-		vals := make(map[float64]float64)
-
-		for _, val := range value {
-			vals[val.Time] += 1
-		}
-		for v := range vals {
-			vals[v] = vals[v] / float64(len(nodes))
-		}
-		addPoints(vals, key, ptss)
-	}
-
-
-	calcMeanPoints(nodes, func(n *Node) map[float64][]int {
-		return n.GetTableStats()
-	}, "TABLE", ptss)
-
-	calcMeanPoints(nodes, func(n *Node) map[float64][]int {
-		return n.GetServerPeersStats()
-	}, "Peers", ptss)
-
-
-	nStats := GetNodeStats()
-
-	vals := make(map[float64]float64)
-	for k,v := range nStats {
-		sum := 0
-		for _, v := range v {
-			sum += v
-		}
-
-		if sum > 0 {
-			vals[k] = float64(sum) / float64(len(v))
-		}
-	}
-
-	addPoints(vals, "NODES", ptss)
-
-	if common.IsUseGlobalCollector {
-		for name, vals := range common.GlobalCollector.CollectMetrics() {
-			addPoints(vals, name, ptss)
-		}
-	} else {
-		util.Print("Non-global collector not implemented")
-	}
-
-
-	for name, vals := range common.GlobalCollector.CollectMetrics() {
-		addPoints(vals, name, ptss)
-	}
-*/
 func Test() {
 	rand.Seed(int64(0))
 

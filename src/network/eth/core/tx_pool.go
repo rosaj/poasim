@@ -77,6 +77,9 @@ var (
 	// than some meaningful limit a user might use. This is not a consensus error
 	// making the transaction invalid, rather a DOS protection.
 	ErrOversizedData = errors.New("oversized data")
+
+
+	ErrKnownTransaction = errors.New(metrics.KnownTransaction)
 )
 
 var (
@@ -609,7 +612,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 	hash := tx.Hash()
 	if pool.all.Get(hash) != nil {
 		pool.log("Discarding already known transaction", "nonce", tx.Nonce(), "hash", hash)
-		return false, fmt.Errorf("known transaction: %x", hash)
+		return false, ErrKnownTransaction// fmt.Errorf("known transaction: %x", hash)
 	}
 	// If the transaction fails basic validation, discard it
 	if err := pool.validateTx(tx, local); err != nil {
@@ -801,6 +804,7 @@ func (pool *TxPool) logErrors(errors []error)  {
 			if err != nil  {
 				pool.Update(err.Error())
 				count += 1
+				//	Print(err)
 			}
 		}
 

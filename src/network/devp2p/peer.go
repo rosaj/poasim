@@ -140,7 +140,6 @@ func (p *Peer) run() {
 func (p *Peer) Run()  {
 	p.startProtocols()
 	p.pingLoop()
-
 }
 
 

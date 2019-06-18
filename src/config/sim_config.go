@@ -9,15 +9,15 @@ import (
 
 var SimConfig = config {
 
-	SimulationTime: (1 * 6 * time.Hour).Seconds(),
+	SimulationTime: (1 * 4 * time.Hour).Seconds(),
 
-	NodeCount: 12,
+	NodeCount: 6,
 
 	NodeStabilisationTime:  1 * time.Minute.Seconds(),
 
-	ChurnEnabled: true,
+	ChurnEnabled: false,
 
-	NodeArrivalDistr: NewNormalDistr((15*time.Second.Seconds()), 0),
+	NodeArrivalDistr: NewNormalDistr((13*time.Second.Seconds()), 0),
 
 	NodeSessionTimeDistr: NewExpDistr(1 /( 24 * (time.Hour).Seconds())),
 
@@ -31,12 +31,13 @@ var SimConfig = config {
 
 	MinerCount: 6,
 
-	TransactionIntervalDistr: NewExpDistr(1/0.8),
+	TransactionIntervalDistr: NewExpDistr(1/0.08),
 
 	SimMode: ETHEREUM,
 
 	ActorCount:  1000,
 
+	FastMode: true, //TODO: this
 }
 
 var LogConfig = logConfig {
@@ -74,19 +75,23 @@ var LogConfig = logConfig {
 
 var MetricConfig  = metricConfig {
 
-	GroupFactor: 60,
+	GroupFactor: 15,
 
-	ExportType: PNG,
+	ExportType: CSV,
+
+	CollectType: Average,
 
 //	Metrics: append (make([]string, 0), metrics.GasLimit),
 	////	Metrics: metrics.TxPoolMetrics[:],
-	Metrics: metrics.AllTxPoolMetrics[:],
+//	Metrics: append(metrics.AllTxPoolMetrics[:], metrics.GasLimit),
+	Metrics: metrics.AllMetrics,
+//	Metrics: metrics.AllTxPoolMetrics[:],
 }
 
 
 var EthConfig = EthereumConfig {
 	ChainConfig: ChainConfig,
-	MinerConfig: testMinerConfig,
+	MinerConfig: defaultMinerConfig,
 	TxPoolConfig: defaultTxPoolConfig,
 }
 
@@ -137,7 +142,6 @@ var	testMinerConfig = &minerConfig {
 }
 
 var	defaultMinerConfig = &minerConfig {
-	//Default 8000000
 	GasFloor: 8000000,
 	GasCeil:  8000000,
 	GasPrice: big.NewInt(params.Wei),

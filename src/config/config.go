@@ -52,6 +52,8 @@ type config struct {
 	SimMode mode
 
 	ActorCount int
+
+	FastMode bool
 }
 
 type mode string
@@ -102,6 +104,13 @@ var (
 	PNG = ExportType("png")
 	CSV = ExportType("csv")
 )
+
+type dataCollectType int
+var	(
+	Average		= dataCollectType(0)
+	Cumulative  = dataCollectType(1)
+)
+
 type metricConfig struct {
 	// jedinica po kojoj se grupiraju poruke
 	// npr. 60 znaci da se poruke grupiraju po minuti
@@ -110,6 +119,8 @@ type metricConfig struct {
 	Metrics []string
 
 	ExportType ExportType
+
+	CollectType dataCollectType
 
 }
 
@@ -144,7 +155,7 @@ type AuraConfig struct {
 type ConsensusEngine int
 var (
 	CLIQUE	  = ConsensusEngine(1)
-	AURA	= ConsensusEngine(2)
+	AURA	  = ConsensusEngine(2)
 )
 
 
