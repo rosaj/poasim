@@ -169,7 +169,7 @@ type minerConfig struct {
 
 func (config *config) NextTrInterval() (interval float64) {
 	interval = config.TransactionIntervalDistr.nextValue()
-	//	log.Print("TrInterval: ", interval)
+	//log.Print("TrInterval: ", interval)
 	return
 }
 

@@ -9,13 +9,13 @@ import (
 
 var SimConfig = config {
 
-	SimulationTime: (1 * 1 * time.Hour).Seconds(),
+	SimulationTime: (1 * 24 * time.Hour).Seconds(),
 
-	NodeCount: 6,
+	NodeCount: 12,
 
 	NodeStabilisationTime:  1 * time.Minute.Seconds(),
 
-	ChurnEnabled: false,
+	ChurnEnabled: true,
 
 	NodeArrivalDistr: NewNormalDistr((15*time.Second.Seconds()), 0),
 
@@ -31,7 +31,7 @@ var SimConfig = config {
 
 	MinerCount: 6,
 
-	TransactionIntervalDistr: NewExpDistr(1),
+	TransactionIntervalDistr: NewExpDistr(1/0.8),
 
 	SimMode: ETHEREUM,
 
@@ -41,7 +41,7 @@ var SimConfig = config {
 
 var LogConfig = logConfig {
 
-	Logging: true,
+	Logging: false,
 
 	LogMessages: false,
 

@@ -23,7 +23,7 @@ func txs(broadcastNodes []*network.Node,  actorCount int, stepFunc func(count in
 		actorsAddrs = append(actorsAddrs, addr)
 	}
 
-	count := 0
+	count, errCount := 0, 0
 	next, step := stepFunc(count)
 	for  next {
 
@@ -34,7 +34,7 @@ func txs(broadcastNodes []*network.Node,  actorCount int, stepFunc func(count in
 		tx := newTransaction(actors[addr], core.BankAddress, nonceCounter[addr], big.NewInt(1))
 		nonceCounter[addr]+=1
 
-		randomBroadcast(broadcastNodes, append(make(types.Transactions, 0), tx))
+		errCount += randomBroadcast(broadcastNodes, append(make(types.Transactions, 0), tx))
 
 		if step > 0 {
 			godes.Advance(step)
@@ -44,7 +44,7 @@ func txs(broadcastNodes []*network.Node,  actorCount int, stepFunc func(count in
 		next, step = stepFunc(count)
 	}
 
-	util.Print("Generated", count, "txs")
+	util.Print("Generated", count, "txs", "errors", errCount, "final:", count-errCount)
 }
 
 
@@ -84,7 +84,14 @@ func Txs(broadcastNodes []*network.Node, actorCount int, txCount int, step float
 func TxsDistr(broadcastNodes []*network.Node)  {
 
 	txs(broadcastNodes, SimConfig.ActorCount, func(count int) (bool, float64) {
-		return !SimConfig.SimulationEnded(), SimConfig.NextTrInterval()
+		//return !SimConfig.SimulationEnded(), SimConfig.NextTrInterval()
+		return godes.GetSystemTime() + 60 < SimConfig.SimulationTime, SimConfig.NextTrInterval()
+	})
+}
+
+func AsyncTxsDistr(broadcastNodes []*network.Node)  {
+	util.StartNewRunner(func() {
+		TxsDistr(broadcastNodes)
 	})
 }
 
@@ -97,15 +104,19 @@ func AsyncTxs(broadcastNodes []*network.Node, actorCount int, txCount int, step 
 
 
 
-func randomBroadcast(broadcastNodes []*network.Node, txs types.Transactions)  {
+func randomBroadcast(broadcastNodes []*network.Node, txs types.Transactions) int {
 	index := rand.Intn(len(broadcastNodes))
 	errors := broadcastNodes[index].Server().GetProtocolManager().AddTxs(txs)
 	//util.Log("sending to ", broadcastNodes[index].Name())
+	errCount := 0
 	for _, err := range errors {
 		if err != nil {
+			errCount += 1
 			util.LogError(err)
 		}
 	}
+	return errCount
+
 /*
 	for _, node := range broadcastNodes {
 		fmt.Print(node.Name(), " pending txs ", node.Server().GetProtocolManager().PendingTxCount(), " ")
