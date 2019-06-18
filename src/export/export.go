@@ -31,13 +31,11 @@ func addPoints(vals map[float64]float64, key string, ptss map[string]plotter.XYs
 
 	pts := make(plotter.XYs, len(vals))
 
-	y := 0
 
-	for _, key := range keys {
+	for y, key := range keys {
 
 		pts[y].X = key
 		pts[y].Y = vals[key]
-		y+=1
 		//fmt.Println(key, value)
 	}
 	ptss[key] = pts
@@ -45,7 +43,7 @@ func addPoints(vals map[float64]float64, key string, ptss map[string]plotter.XYs
 func Stats(nodes []*Node)  {
 
 
-	//stats := [...]string{ eth.MinedBlock}
+	//stats := [...]string{ OnlineNodes}
 	stats := config.MetricConfig.Metrics
 
 	all := make(map[string]map[float64]float64, 0)
@@ -73,11 +71,6 @@ func Stats(nodes []*Node)  {
 
 	ptss := make(map[string]plotter.XYs)
 
-	if all[OnlineNodes] != nil {
-		nStats := GetNodeStats()
-		addPoints(nStats, OnlineNodes, ptss)
-	}
-
 
 	for key, value := range all {
 
@@ -95,6 +88,12 @@ func Stats(nodes []*Node)  {
 
 			addPoints(value, key, ptss)
 		}
+	}
+
+	// mora bit na kraju, jer se inace pregazi praznim vrijednostima
+	if all[OnlineNodes] != nil {
+		nStats := GetNodeStats()
+		addPoints(nStats, OnlineNodes, ptss)
 	}
 
 
@@ -216,7 +215,8 @@ func csvExport(data map[string]plotter.XYs, name string) error {
 			// ako do kraja treba popunit sa praznim mjestima ili
 			// ako je izmedu x-eva praznega mjesta
 			// onda pisi prazna mjesta
-			if  ind >= len(vals) || x < vals[ind].X  {
+//			util.Print(i, ind, x, vals[ind].X )
+			if  ind >= len(vals) || x < vals[ind].X * groupFactor {
 				rows[i] = append(rows[i], "")
 				continue
 			}

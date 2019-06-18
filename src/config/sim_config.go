@@ -9,19 +9,19 @@ import (
 
 var SimConfig = config {
 
-	SimulationTime: (1 * 4 * time.Hour).Seconds(),
+	SimulationTime: (1 * 6 * time.Hour).Seconds(),
 
-	NodeCount: 6,
+	NodeCount: 1000,
 
-	NodeStabilisationTime:  1 * time.Minute.Seconds(),
+	NodeStabilisationTime:  10 * time.Minute.Seconds(),
 
-	ChurnEnabled: false,
+	ChurnEnabled: true,
 
-	NodeArrivalDistr: NewNormalDistr((13*time.Second.Seconds()), 0),
+	NodeArrivalDistr: NewNormalDistr((80*time.Minute.Seconds()/1000), 0),
 
-	NodeSessionTimeDistr: NewExpDistr(1 /( 24 * (time.Hour).Seconds())),
+	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Hour).Seconds())),
 
-	NodeIntersessionTimeDistr: NewExpDistr( 1 / (30 * time.Second).Seconds()),
+	NodeIntersessionTimeDistr: NewExpDistr( 1 / (1 * time.Minute).Seconds()),
 
 	NodeLifetimeDistr: NewExpDistr(1 / (11111116 * time.Minute.Seconds())),
 
@@ -33,7 +33,7 @@ var SimConfig = config {
 
 	TransactionIntervalDistr: NewExpDistr(1/0.08),
 
-	SimMode: ETHEREUM,
+	SimMode: SERVER,
 
 	ActorCount:  1000,
 
@@ -85,6 +85,7 @@ var MetricConfig  = metricConfig {
 	////	Metrics: metrics.TxPoolMetrics[:],
 //	Metrics: append(metrics.AllTxPoolMetrics[:], metrics.GasLimit),
 	Metrics: metrics.AllMetrics,
+//	Metrics: metrics.DiscoveryMetrics[:],
 //	Metrics: metrics.AllTxPoolMetrics[:],
 }
 
