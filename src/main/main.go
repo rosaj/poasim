@@ -121,9 +121,9 @@ func runSim(){
 
 	if config.SimConfig.SimMode == config.ETHEREUM {
 
-		generate.AsyncTxs(nodes[:config.SimConfig.NodeCount], 1000, 36000, 0.08)
+//		generate.AsyncTxs(nodes[:config.SimConfig.NodeCount], 1000, 36000, 0.08)
 
-	//	generate.TxsDistr(nodes[:config.SimConfig.NodeCount], 1000)
+		generate.TxsDistr(nodes[:config.SimConfig.NodeCount])
 
 
 	}

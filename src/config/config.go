@@ -47,18 +47,19 @@ type config struct {
 
 	MinerCount int
 
-	BlockTime float64
-
 	TransactionIntervalDistr Distribution
 
 	SimMode mode
+
+	ActorCount int
 }
 
-type mode int
+type mode string
+
 var (
-	DISCOVERY 	= mode(0)
-	SERVER		= mode(1)
-	ETHEREUM	= mode(2)
+	DISCOVERY 	= mode("Discovery")
+	SERVER		= mode("Server")
+	ETHEREUM	= mode("ETHEREUM")
 )
 
 
@@ -168,7 +169,7 @@ type minerConfig struct {
 
 func (config *config) NextTrInterval() (interval float64) {
 	interval = config.TransactionIntervalDistr.nextValue()
-	//	Log("TrInterval: ", interval)
+	//	log.Print("TrInterval: ", interval)
 	return
 }
 

@@ -24,8 +24,8 @@ func txs(broadcastNodes []*network.Node,  actorCount int, stepFunc func(count in
 	}
 
 	count := 0
-
-	for next, step := stepFunc(count); next; {
+	next, step := stepFunc(count)
+	for  next {
 
 		nextActor := rand.Intn(actorCount)
 
@@ -41,8 +41,10 @@ func txs(broadcastNodes []*network.Node,  actorCount int, stepFunc func(count in
 		}
 
 		count += 1
+		next, step = stepFunc(count)
 	}
 
+	util.Print("Generated", count, "txs")
 }
 
 
@@ -79,36 +81,11 @@ func Txs(broadcastNodes []*network.Node, actorCount int, txCount int, step float
 */
 }
 
-func TxsDistr(broadcastNodes []*network.Node, actorCount int)  {
+func TxsDistr(broadcastNodes []*network.Node)  {
 
-	txs(broadcastNodes, actorCount, func(count int) (bool, float64) {
+	txs(broadcastNodes, SimConfig.ActorCount, func(count int) (bool, float64) {
 		return !SimConfig.SimulationEnded(), SimConfig.NextTrInterval()
 	})
-/*
-	actors := core.Actors
-	actorsAddrs := make([]common.Address, 0)
-	for addr := range actors {
-		actorsAddrs = append(actorsAddrs, addr)
-	}
-
-
-	for !SimConfig.SimulationEnded()  {
-
-		nextActor := rand.Intn(actorCount)
-
-		addr := actorsAddrs[nextActor]
-
-		tx := newTransaction(actors[addr], core.BankAddress, nonceCounter[addr], big.NewInt(1))
-		nonceCounter[addr]+=1
-
-		randomBroadcast(broadcastNodes, append(make(types.Transactions, 0), tx))
-
-		step := SimConfig.NextTrInterval()
-		if step > 0 {
-			godes.Advance(step)
-		}
-	}
-*/
 }
 
 func AsyncTxs(broadcastNodes []*network.Node, actorCount int, txCount int, step float64)  {

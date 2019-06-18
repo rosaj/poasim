@@ -15,7 +15,7 @@ var SimConfig = config {
 
 	NodeStabilisationTime:  1 * time.Minute.Seconds(),
 
-	ChurnEnabled: true,
+	ChurnEnabled: false,
 
 	NodeArrivalDistr: NewNormalDistr((15*time.Second.Seconds()), 0),
 
@@ -31,11 +31,11 @@ var SimConfig = config {
 
 	MinerCount: 6,
 
-	BlockTime: 15,
-
-	TransactionIntervalDistr: NewExpDistr(0.2),
+	TransactionIntervalDistr: NewExpDistr(1),
 
 	SimMode: ETHEREUM,
+
+	ActorCount:  1000,
 
 }
 
