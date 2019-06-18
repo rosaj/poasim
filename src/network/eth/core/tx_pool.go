@@ -47,11 +47,11 @@ var (
 
 	// ErrNonceTooLow is returned if the nonce of a transaction is lower than the
 	// one present in the local chain.
-	ErrNonceTooLow = errors.New("nonce too low")
+	ErrNonceTooLow = errors.New(metrics.NonceTooLow)
 
 	// ErrUnderpriced is returned if a transaction's gas price is below the minimum
 	// configured for the transaction pool.
-	ErrUnderpriced = errors.New("transaction underpriced")
+	ErrUnderpriced = errors.New(metrics.TransactionUnderpriced)
 
 	// ErrReplaceUnderpriced is returned if a transaction is attempted to be replaced
 	// with a different one without the required price bump.
@@ -59,7 +59,7 @@ var (
 
 	// ErrInsufficientFunds is returned if the total cost of executing a transaction
 	// is higher than the balance of the user's account.
-	ErrInsufficientFunds = errors.New("insufficient funds for gas * price + value")
+	ErrInsufficientFunds = errors.New(metrics.InsufficientFunds)
 
 	// ErrIntrinsicGas is returned if the transaction is specified to use less gas
 	// than required to start the invocation.
@@ -67,7 +67,7 @@ var (
 
 	// ErrGasLimit is returned if a transaction's requested gas limit exceeds the
 	// maximum allowance of the current block.
-	ErrGasLimit = errors.New("exceeds block gas limit")
+	ErrGasLimit = errors.New(metrics.ExceedsGasLimit)
 
 	// ErrNegativeValue is a sanity error to ensure noone is able to specify a
 	// transaction with a negative value.
@@ -787,7 +787,18 @@ func (pool *TxPool) addTxs(txs []*types.Transaction, local bool) []error {
 		types.Sender(pool.signer, tx)
 	}
 
-	return pool.addTxsLocked(txs, local)
+	err := pool.addTxsLocked(txs, local)
+	pool.logErrors(err)
+	return err
+}
+
+func (pool *TxPool) logErrors(errors []error)  {
+	if errors != nil && len(errors) > 0 {
+		pool.UpdateWithValue(metrics.TxPoolErrors, len(errors))
+		for _, err := range errors {
+			pool.Update(err.Error())
+		}
+	}
 }
 
 // addTxsLocked attempts to queue a batch of transactions if they are valid,

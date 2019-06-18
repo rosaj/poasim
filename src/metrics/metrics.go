@@ -41,6 +41,25 @@ var TxPoolMetrics = [...]string {
 	QueuedTxs,
 }
 
+const (
+	TxPoolErrors 			= "Tx pool errors"
+	TransactionUnderpriced 	= "transaction underpriced"
+	InsufficientFunds		= "insufficient funds for gas * price + value"
+	NonceTooLow				= "nonce oto low"
+	ExceedsGasLimit 		= "exceeds block gas limit"
+)
+
+var TxPoolErrorMetrics = [...]string {
+	TxPoolErrors,
+	TransactionUnderpriced,
+	InsufficientFunds,
+	NonceTooLow,
+	ExceedsGasLimit,
+}
+
+var AllTxPoolMetrics = append(TxPoolMetrics[:], TxPoolErrorMetrics[:]...)
+
+
 var	(
 	DiscoveryTable		= "DiscoveryTable"
 )
