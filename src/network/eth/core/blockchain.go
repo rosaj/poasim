@@ -18,9 +18,9 @@
 package core
 
 import (
-	"../../../metrics"
 	. "../../../common"
 	"../../../config"
+	"../../../metrics"
 	. "../../../util"
 	"../../eth/common"
 	"../../eth/common/prque"
