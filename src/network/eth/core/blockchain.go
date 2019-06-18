@@ -18,6 +18,7 @@
 package core
 
 import (
+	"../../../metrics"
 	. "../../../common"
 	"../../../config"
 	. "../../../util"
@@ -79,16 +80,17 @@ const (
 
 
 const (
-	NonContiguousInsert 		= "non contiguous insert"
-	NonContiguousReceiptInsert 	= "non contiguous receipt insert"
-	BadBlock            		= "bad block"
-	InsertNewBlock      		= "insert new block"
-	InsertForkedBlock   		= "insert forked block"
-	SidechainDetected   		= "sidechain detected"
-	SidechainInject     		= "sidechain inject"
-	MissingParent       		= "missing parent"
-	ChainSplitDetected  		= "chain split detected"
-	ChainSplitDepth				= "chain split depth"
+	NonContiguousInsert 		= metrics.NonContiguousInsert
+	NonContiguousReceiptInsert 	= metrics.NonContiguousReceiptInsert
+	BadBlock            		= metrics.BadBlock
+	InsertNewBlock      		= metrics.InsertNewBlock
+	InsertForkedBlock   		= metrics.InsertForkedBlock
+	SidechainDetected   		= metrics.SidechainDetected
+	SidechainInject     		= metrics.SidechainInject
+	MissingParent       		= metrics.MissingParent
+	ChainSplitDetected  		= metrics.ChainSplitDetected
+	ChainSplitDepth				= metrics.ChainSplitDepth
+	GasLimit					= metrics.GasLimit
 )
 
 
@@ -1238,6 +1240,8 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 				"root", block.Root())
 
 			bc.Update(InsertNewBlock)
+
+			bc.Set(GasLimit, int(block.GasLimit()))
 
 			coalescedLogs = append(coalescedLogs, logs...)
 			events = append(events, ChainEvent{block, block.Hash()})

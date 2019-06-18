@@ -5,7 +5,6 @@ import (
 	. "../../config"
 	"../../metrics"
 	. "../../util"
-
 	"errors"
 	"fmt"
 	"github.com/agoussia/godes"
@@ -112,7 +111,9 @@ func (srv *Server) Self() INode {
 func (srv *Server) GetProtocols() []IProtocol {
 	return srv.Protocols
 }
-
+func (srv *Server) GetProtocolManager() IProtocolManager {
+	return nil
+}
 /*
 func (srv *Server) GetProtocolManager() IProtocolManager {
 	return srv.pm

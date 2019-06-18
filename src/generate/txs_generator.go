@@ -1,6 +1,7 @@
 package generate
 
 import (
+	. "../config"
 	"../network"
 	"../network/eth/common"
 	"../network/eth/core"
@@ -14,8 +15,44 @@ import (
 
 var	nonceCounter = make(map[common.Address]uint64)
 
+func txs(broadcastNodes []*network.Node,  actorCount int, stepFunc func(count int) (bool, float64))  {
+
+	actors := core.Actors
+	actorsAddrs := make([]common.Address, 0)
+	for addr := range actors {
+		actorsAddrs = append(actorsAddrs, addr)
+	}
+
+	count := 0
+
+	for next, step := stepFunc(count); next; {
+
+		nextActor := rand.Intn(actorCount)
+
+		addr := actorsAddrs[nextActor]
+
+		tx := newTransaction(actors[addr], core.BankAddress, nonceCounter[addr], big.NewInt(1))
+		nonceCounter[addr]+=1
+
+		randomBroadcast(broadcastNodes, append(make(types.Transactions, 0), tx))
+
+		if step > 0 {
+			godes.Advance(step)
+		}
+
+		count += 1
+	}
+
+}
+
+
 func Txs(broadcastNodes []*network.Node, actorCount int, txCount int, step float64)  {
 
+	txs(broadcastNodes, actorCount, func(count int) (bool, float64) {
+		return count < txCount, step
+	})
+
+/*
 	//actors := generateActors(actorCount)
 	actors := core.Actors
 	actorsAddrs := make([]common.Address, 0)
@@ -39,7 +76,39 @@ func Txs(broadcastNodes []*network.Node, actorCount int, txCount int, step float
 			godes.Advance(step)
 		}
 	}
+*/
+}
 
+func TxsDistr(broadcastNodes []*network.Node, actorCount int)  {
+
+	txs(broadcastNodes, actorCount, func(count int) (bool, float64) {
+		return !SimConfig.SimulationEnded(), SimConfig.NextTrInterval()
+	})
+/*
+	actors := core.Actors
+	actorsAddrs := make([]common.Address, 0)
+	for addr := range actors {
+		actorsAddrs = append(actorsAddrs, addr)
+	}
+
+
+	for !SimConfig.SimulationEnded()  {
+
+		nextActor := rand.Intn(actorCount)
+
+		addr := actorsAddrs[nextActor]
+
+		tx := newTransaction(actors[addr], core.BankAddress, nonceCounter[addr], big.NewInt(1))
+		nonceCounter[addr]+=1
+
+		randomBroadcast(broadcastNodes, append(make(types.Transactions, 0), tx))
+
+		step := SimConfig.NextTrInterval()
+		if step > 0 {
+			godes.Advance(step)
+		}
+	}
+*/
 }
 
 func AsyncTxs(broadcastNodes []*network.Node, actorCount int, txCount int, step float64)  {

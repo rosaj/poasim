@@ -11,6 +11,7 @@ const (
 	MissingParent       		= "missing parent"
 	ChainSplitDetected  		= "chain split detected"
 	ChainSplitDepth				= "chain split depth"
+	GasLimit					= "gas limit"
 )
 
 
@@ -25,6 +26,7 @@ var	BlockchainMetrics = [...]string{
 	MissingParent,
 	ChainSplitDetected,
 	ChainSplitDepth,
+	GasLimit,
 }
 
 

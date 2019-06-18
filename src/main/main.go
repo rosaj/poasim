@@ -119,9 +119,14 @@ func runSim(){
 
 	godes.Advance(config.SimConfig.NodeStabilisationTime)
 
+	if config.SimConfig.SimMode == config.ETHEREUM {
 
-	generate.AsyncTxs(nodes[:config.SimConfig.NodeCount], 1000, 600, 0.08)
+		generate.AsyncTxs(nodes[:config.SimConfig.NodeCount], 1000, 36000, 0.08)
 
+	//	generate.TxsDistr(nodes[:config.SimConfig.NodeCount], 1000)
+
+
+	}
 	//TODO: metrike npr. blockchain broj insert-a, forka, sidechaina, txs received etc
 
 	/*

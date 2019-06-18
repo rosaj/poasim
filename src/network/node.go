@@ -3,6 +3,7 @@ package network
 import (
 	. "../common"
 	. "../config"
+	"../network/devp2p"
 	"../network/discovery"
 	"../network/eth"
 	"../network/eth/common"
@@ -268,12 +269,25 @@ func (n *Node) startP2P()  {
 }
 
 func (n *Node) startServer()  {
-	var err error
-	n.server, err = eth.New(n, n) //devp2p.NewServer(n)
-	if err != nil {
-		n.log(err)
+
+	switch SimConfig.SimMode {
+
+	case DISCOVERY:
 		return
+
+	case SERVER:
+		n.server = devp2p.NewServer(n, n)
+
+	case ETHEREUM:
+		var err error
+		n.server, err = eth.New(n, n)
+		if err != nil {
+			n.log(err)
+			return
+		}
 	}
+
+
 	n.server.Start()
 	n.log("Started server")
 }

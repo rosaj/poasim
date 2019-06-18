@@ -9,7 +9,7 @@ import (
 
 var SimConfig = config {
 
-	SimulationTime: (1 * 24 * time.Hour).Seconds(),
+	SimulationTime: (1 * 1 * time.Hour).Seconds(),
 
 	NodeCount: 6,
 
@@ -34,6 +34,8 @@ var SimConfig = config {
 	BlockTime: 15,
 
 	TransactionIntervalDistr: NewExpDistr(0.2),
+
+	SimMode: ETHEREUM,
 
 }
 
@@ -76,13 +78,14 @@ var MetricConfig  = metricConfig {
 
 	ExportType: PNG,
 
-	Metrics: metrics.TxPoolMetrics[:],
+	Metrics: append (make([]string, 0), metrics.GasLimit),
+//	Metrics: metrics.TxPoolMetrics[:],
 }
 
 
 var EthConfig = EthereumConfig {
 	ChainConfig: ChainConfig,
-	MinerConfig: defaultMinerConfig,
+	MinerConfig: testMinerConfig,
 	TxPoolConfig: defaultTxPoolConfig,
 }
 

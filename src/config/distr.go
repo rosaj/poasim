@@ -101,7 +101,7 @@ type TriangularDistr struct {
 	c	float64
 }
 
-type distribution interface {
+type Distribution interface {
 	nextValue() float64
 }
 

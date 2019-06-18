@@ -22,26 +22,26 @@ type config struct {
 	NodeStabilisationTime float64
 
 	// distribucija dolaska cvorova na mrezu
-	NodeArrivalDistr distribution
+	NodeArrivalDistr Distribution
 
 	// distribucija trajanja sesija cvorova
-	NodeSessionTimeDistr distribution
+	NodeSessionTimeDistr Distribution
 
 	// distribucija trajanja nedostupnosti(offline) cvorova
-	NodeIntersessionTimeDistr distribution
+	NodeIntersessionTimeDistr Distribution
 
 	// vrijeme od kada se cvor spoji na mrezu do kada se zauvjek odspoji
-	NodeLifetimeDistr distribution
+	NodeLifetimeDistr Distribution
 
 	// distribucija spajanja novih nodova nakon sto se inicijalno svi nodovi spoje i mreza se stablizira
-	NewNodeArrivalDistr distribution
+	NewNodeArrivalDistr Distribution
 
 	// latencija slanja poruke preko mreze
-	NetworkLatency distribution
+	NetworkLatency Distribution
 
 	//NetworkUnreliability float64
 	//TODO: impl gubljenje paketa ili u obliku distr ili postotka
-	//LostMessagesDistr distribution
+	//LostMessagesDistr Distribution
 
 	MaxPeers int
 
@@ -49,8 +49,18 @@ type config struct {
 
 	BlockTime float64
 
-	TransactionIntervalDistr distribution
+	TransactionIntervalDistr Distribution
+
+	SimMode mode
 }
+
+type mode int
+var (
+	DISCOVERY 	= mode(0)
+	SERVER		= mode(1)
+	ETHEREUM	= mode(2)
+)
+
 
 type logConfig struct {
 	// flag da li je globalno logiranje ukljuceno
@@ -199,7 +209,7 @@ func (config *config) SimulationEnded() bool {
 
 
 
-func clampToSimTime(config *config, distr distribution) (interval float64)  {
+func clampToSimTime(config *config, distr Distribution) (interval float64)  {
 	interval = distr.nextValue()
 
 	sysTime := godes.GetSystemTime()
