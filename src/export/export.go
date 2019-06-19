@@ -163,6 +163,9 @@ func Stats(nodes []*Node)  {
 }
 
 func csvExport(data map[string]plotter.XYs, name string) error {
+
+	name = "test.csv"
+
 	file, err := os.Create(name)
 	if err != nil {
 		return err

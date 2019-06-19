@@ -9,15 +9,15 @@ import (
 
 var SimConfig = config {
 
-	SimulationTime: (1 * 6 * time.Hour).Seconds(),
+	SimulationTime: (1 * 30 * time.Minute).Seconds(),
 
-	NodeCount: 1000,
+	NodeCount: 6,
 
-	NodeStabilisationTime:  10 * time.Minute.Seconds(),
+	NodeStabilisationTime:  30 * time.Second.Seconds(),
 
 	ChurnEnabled: true,
 
-	NodeArrivalDistr: NewNormalDistr((80*time.Minute.Seconds()/1000), 0),
+	NodeArrivalDistr: NewNormalDistr((13*time.Second.Seconds()), 0),
 
 	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Hour).Seconds())),
 
@@ -33,9 +33,9 @@ var SimConfig = config {
 
 	TransactionIntervalDistr: NewExpDistr(1/0.08),
 
-	SimMode: SERVER,
+	SimMode: ETHEREUM,
 
-	ActorCount:  1000,
+	ActorCount:  10000,
 
 	FastMode: true, //TODO: this
 }
