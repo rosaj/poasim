@@ -141,9 +141,10 @@ func randomBroadcast(broadcastNodes []*network.Node, txs types.Transactions) int
  */
 }
 
-
+var txCount = 0
 func newTransaction(from *ecdsa.PrivateKey, to common.Address, nonce uint64, amount	*big.Int) *types.Transaction {
-	tx := types.NewTransaction(nonce, to, amount, 100000, big.NewInt(1), nil)
+	txCount++
+	tx := types.NewTransaction(nonce, to, amount, 100000, big.NewInt(int64(txCount)), nil)
 	tx, _ = types.SignTx(tx, types.HomesteadSigner{}, from)
 	return tx
 }

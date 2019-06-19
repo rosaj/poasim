@@ -127,7 +127,6 @@ func runSim(){
 
 
 	}
-	//TODO: metrike npr. blockchain broj insert-a, forka, sidechaina, txs received etc
 
 	waitForEnd(nodes)
 }
