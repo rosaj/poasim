@@ -1,7 +1,9 @@
 package generate
 
 import (
+	. "../common"
 	. "../config"
+	"../metrics"
 	"../network"
 	"../network/eth/common"
 	"../network/eth/core"
@@ -13,8 +15,11 @@ import (
 	"math/rand"
 )
 
+func GetTxsStats() map[float64]float64 {
+	return txStats.Collect(metrics.TxsArrival)
+}
 
-
+var txStats = GlobalMetricCollector
 var	nonceCounter = make(map[common.Address]uint64)
 
 func txs(broadcastNodes []*network.Node,  actorCount int, stepFunc func(count int) (bool, float64))  {
@@ -114,6 +119,8 @@ func randomBroadcast(broadcastNodes []*network.Node, txs types.Transactions) int
 	for !broadcastNodes[index].IsOnline() {
 		index = rand.Intn(len(broadcastNodes))
 	}
+
+	txStats.Update(metrics.TxsArrival)
 
 	errors := broadcastNodes[index].Server().GetProtocolManager().AddTxs(txs)
 	//util.Log("sending to ", broadcastNodes[index].Name())

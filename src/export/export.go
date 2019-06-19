@@ -3,6 +3,8 @@ package export
 import (
 	"../common"
 	"../config"
+	"../generate"
+	"../metrics"
 	. "../network"
 	"../util"
 	"encoding/csv"
@@ -94,6 +96,10 @@ func Stats(nodes []*Node)  {
 	if all[OnlineNodes] != nil {
 		nStats := GetNodeStats()
 		addPoints(nStats, OnlineNodes, ptss)
+	}
+
+	if all[metrics.TxsArrival] != nil {
+		addPoints(generate.GetTxsStats(), metrics.TxsArrival, ptss)
 	}
 
 

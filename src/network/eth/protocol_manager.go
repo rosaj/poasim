@@ -554,8 +554,6 @@ func (pm *ProtocolManager) AddTxs(txs types.Transactions) []error {
 
 	pm.log("Added txs", len(txs), "pending", pm.PendingTxCount())
 
-	pm.Update(metrics.TxsArrival)
-
 	errors := pm.txpool.AddRemotes(txs)
 
 	return errors
