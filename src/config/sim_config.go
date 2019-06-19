@@ -9,21 +9,21 @@ import (
 
 var SimConfig = config {
 
-	SimulationTime: (1 * 30 * time.Minute).Seconds(),
+	SimulationTime: (1 * 180 * time.Minute).Seconds(),
 
-	NodeCount: 6,
+	NodeCount: 10000,
 
-	NodeStabilisationTime:  30 * time.Second.Seconds(),
+	NodeStabilisationTime:  40 * time.Minute.Seconds(),
 
 	ChurnEnabled: true,
 
-	NodeArrivalDistr: NewNormalDistr((13*time.Second.Seconds()), 0),
+	NodeArrivalDistr: NewNormalDistr((80*time.Minute.Seconds())/1000, (80*time.Minute.Seconds())/10000),
 
 	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Hour).Seconds())),
 
 	NodeIntersessionTimeDistr: NewExpDistr( 1 / (1 * time.Minute).Seconds()),
 
-	NodeLifetimeDistr: NewExpDistr(1 / (11111116 * time.Minute.Seconds())),
+	NodeLifetimeDistr: NewExpDistr(1 / (2 * time.Hour.Seconds())),
 
 	NetworkLatency:  NewLogNormalDistr(.209,.157),// u metodi NextNetworkLatency dodano /10
 
@@ -33,7 +33,7 @@ var SimConfig = config {
 
 	TransactionIntervalDistr: NewExpDistr(1/0.08),
 
-	SimMode: ETHEREUM,
+	SimMode: SERVER,
 
 	ActorCount:  10000,
 
