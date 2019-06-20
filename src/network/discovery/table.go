@@ -1,9 +1,9 @@
 package discovery
 
 import (
-	"../../metrics"
 	. "../../common"
 	. "../../config"
+	"../../metrics"
 	. "../../network/message"
 	. "../../util"
 	"../eth/common"

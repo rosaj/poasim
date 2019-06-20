@@ -6,14 +6,12 @@ import (
 	"../export"
 	"../generate"
 	"../network"
-	"../network/eth"
-	"../network/eth/common"
 	"../network/eth/core"
 	"../network/protocol"
+	. "../scenario"
 	"../util"
 	"github.com/agoussia/godes"
 	"math"
-	"math/rand"
 	"runtime"
 	sysTime "time"
 )
@@ -120,7 +118,7 @@ func runSim(){
 
 	godes.Advance(config.SimConfig.NodeStabilisationTime)
 
-	if config.SimConfig.SimMode == config.ETHEREUM {
+	if config.SimConfig.SimMode == config.BLOCKCHAIN {
 
 //		generate.AsyncTxs(nodes[:config.SimConfig.NodeCount], 1000, 36000, 0.08)
 
@@ -129,20 +127,10 @@ func runSim(){
 
 	}
 
-	util.StartNewRunner(func() {
-		godes.Advance( 1 * 60 * 60)
 
-		c := config.SimConfig.NodeCount / 2
+//	ScenarioNodeLeavingNetwork(nodes[:len(nodes) - bootstrapNodeCount],  config.SimConfig.NodeCount/2, sysTime.Hour)
 
-		for c > 0 {
-			i := rand.Intn(len(nodes) - bootstrapNodeCount)
-			if nodes[i].IsOnline() {
-				nodes[i].Kill()
-				c--
-			}
 
-		}
-	})
 
 
 	waitForEnd(nodes)
@@ -188,58 +176,14 @@ func waitForEnd(nodes []*network.Node) {
 	showStats(nodes)
 	//showStats(nodes[0:len(nodes) - bootstrapNodeCount ])
 
-	if config.SimConfig.SimMode == config.ETHEREUM {
-		printBlockchainStats(nodes)
-	}
-}
-func printBlockchainStats(nodes []*network.Node)  {
-
-	es := nodes[0].Server().(*eth.Ethereum)
-	bc := es.BlockChain()
-
-	max := bc.CurrentBlock().NumberU64()
-
-	util.Print("Last block", max)
-
-	for i := 0; i < config.SimConfig.NodeCount ; i+=1  {
-		ob := nodes[i].Server().(*eth.Ethereum).BlockChain().CurrentBlock()
-		util.Print(i, ob.NumberU64())
-	}
-	size := common.StorageSize(0)
-	total := 0
-	for i := max;i >= 1 ; i-=1  {
-		block := bc.GetBlockByNumber(uint64(i))
-		if block != nil {
-			signAddr, err := bc.Engine().Author(block.Header())
-			if err != nil {
-				util.LogError(err)
-			}
-			signer := findNodeByAddress(nodes, signAddr)
-
-			util.Print(block.Number(), "tx count", block.Transactions().Len(), "signer", signer)
-			size += block.Size()
-			size += block.Header().Size()
-
-			total += len(block.Transactions())
-		} else {
-			util.Print("block", i, "je nil")
-		}
-	}
-
-	util.Print("Total num of txs", total)
-	util.Print("BC size", size)
-}
-func findNodeByAddress(nodes []*network.Node, address common.Address) *network.Node {
-	for _, node := range nodes {
-		if node.Address() == address {
-			return node
-		}
-	}
-	return nil
 }
 
 func showStats(nodes []*network.Node)  {
 	export.Stats(nodes)
+
+	if config.SimConfig.SimMode == config.BLOCKCHAIN {
+		PrintBlockchainStats(nodes)
+	}
 }
 
 

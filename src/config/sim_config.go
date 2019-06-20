@@ -11,13 +11,13 @@ var SimConfig = config {
 
 	SimulationTime: (1 * 6 * time.Hour).Seconds(),
 
-	NodeCount: 500,
+	NodeCount: 100,
 
 	NodeStabilisationTime:  10 * time.Minute.Seconds(),
 
 	ChurnEnabled: true,
 
-	NodeArrivalDistr: NewNormalDistr((80*time.Minute.Seconds())/500, (80*time.Minute.Seconds())/1000),
+	NodeArrivalDistr: NewNormalDistr((80*time.Minute.Seconds())/100, (80*time.Minute.Seconds())/1000),
 
 	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Hour).Seconds())),
 
@@ -28,8 +28,6 @@ var SimConfig = config {
 	NetworkLatency:  NewLogNormalDistr(.209,.157),// u metodi NextNetworkLatency dodano /10
 
 	MaxPeers: 25,
-
-	MinerCount: 6,
 
 	SimMode: DEVp2p,
 
@@ -92,9 +90,11 @@ var MetricConfig  = metricConfig {
 //	Metrics: append (make([]string, 0), metrics.GasLimit),
 	////	Metrics: metrics.TxPoolMetrics[:],
 //	Metrics: append(metrics.AllTxPoolMetrics[:], metrics.GasLimit),
-	Metrics: metrics.DiscoveryMetrics[:],
+//	Metrics: metrics.DiscoveryMetrics[:],
 //	Metrics: metrics.DiscoveryMetrics[:],
 //	Metrics: metrics.AllTxPoolMetrics[:],
+
+	Metrics: metrics.AllMetrics,
 
 	MetricCollectType: map[string]DataCollectType{
 		metrics.DiscoveryTable: 	Average,

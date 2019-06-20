@@ -45,8 +45,6 @@ type config struct {
 
 	MaxPeers int
 
-	MinerCount int
-
 	SimMode mode
 
 	FastMode bool
@@ -55,12 +53,12 @@ type config struct {
 	TxGeneratorConfig txGeneratorConfig
 }
 
-type mode string
+type mode int
 
 var (
-	DISCOVERY 	= mode("Discovery")
-	DEVp2p		= mode("DEVp2p")
-	ETHEREUM	= mode("ETHEREUM")
+	DISCOVERY 	= mode(0)
+	DEVp2p		= mode(1)
+	BLOCKCHAIN	= mode(2)
 )
 
 

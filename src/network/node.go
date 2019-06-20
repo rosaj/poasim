@@ -287,7 +287,7 @@ func (n *Node) startServer()  {
 	case DEVp2p:
 		n.server = devp2p.NewServer(n, n)
 
-	case ETHEREUM:
+	case BLOCKCHAIN:
 		var err error
 		n.server, err = eth.New(n, n)
 		if err != nil {
