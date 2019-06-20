@@ -104,10 +104,10 @@ var (
 	CSV = ExportType("csv")
 )
 
-type dataCollectType int
+type DataCollectType int
 var	(
-	Average		= dataCollectType(0)
-	Sum			= dataCollectType(1)
+	Average		= DataCollectType(0)
+	Sum			= DataCollectType(1)
 )
 
 type metricConfig struct {
@@ -119,7 +119,10 @@ type metricConfig struct {
 
 	ExportType ExportType
 
-	CollectType dataCollectType
+	CollectType DataCollectType
+
+	MetricCollectType map[string]DataCollectType
+	
 
 }
 

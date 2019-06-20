@@ -4,6 +4,7 @@ import (
 	"../common"
 	"../config"
 	"fmt"
+	"log"
 
 	"../generate"
 	"../metrics"
@@ -20,6 +21,29 @@ import (
 	"sort"
 	"strconv"
 )
+
+type metricFn func(value map[float64]float64, count map[float64]int) map[float64]float64
+
+var avgFn = func(value map[float64]float64, count map[float64]int) map[float64]float64 {
+	vals := make(map[float64]float64, len(value))
+
+	for v, val := range value {
+		vals[v] = val / float64(count[v])
+	}
+
+	return vals
+}
+
+
+var sumFn = func(value map[float64]float64, count map[float64]int) map[float64]float64 {
+	return value
+}
+
+var metricFnMapper = map[config.DataCollectType] metricFn {
+	config.Sum: 	sumFn,
+	config.Average: avgFn,
+}
+
 
 func addPoints(vals map[float64]float64, key string, ptss map[string]plotter.XYs)  {
 
@@ -86,8 +110,20 @@ func Stats(nodes []*Node)  {
 
 	ptss := make(map[string]plotter.XYs)
 
+	mc := config.MetricConfig
 
 	for key, value := range all {
+		colType := mc.CollectType
+
+		if mc.MetricCollectType != nil {
+			if val, ok := mc.MetricCollectType[key]; ok {
+				colType = val
+			}
+		}
+
+		addPoints(metricFnMapper[colType](value, count[key]), key, ptss)
+
+		/*
 
 		if config.MetricConfig.CollectType == config.Average {
 
@@ -103,6 +139,8 @@ func Stats(nodes []*Node)  {
 
 			addPoints(value, key, ptss)
 		}
+
+		 */
 	}
 
 	// mora bit na kraju, jer se inace pregazi praznim vrijednostima
@@ -184,8 +222,11 @@ func Stats(nodes []*Node)  {
 
 func csvExport(data map[string]plotter.XYs, name string) error {
 
-
-	name = "discovery.csv"
+	dir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	name = dir + "/src/res/discovery.csv"
 
 	file, err := os.Create(name)
 	if err != nil {

@@ -11,19 +11,19 @@ var SimConfig = config {
 
 	SimulationTime: (1 * 6 * time.Hour).Seconds(),
 
-	NodeCount: 100,
+	NodeCount: 500,
 
 	NodeStabilisationTime:  10 * time.Minute.Seconds(),
 
 	ChurnEnabled: true,
 
-	NodeArrivalDistr: NewNormalDistr((80*time.Minute.Seconds())/100, (80*time.Minute.Seconds())/1000),
+	NodeArrivalDistr: NewNormalDistr((80*time.Minute.Seconds())/500, (80*time.Minute.Seconds())/1000),
 
 	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Hour).Seconds())),
 
 	NodeIntersessionTimeDistr: NewExpDistr( 1 / (1 * time.Minute).Seconds()),
 
-	NodeLifetimeDistr: NewExpDistr(1 / (6222222 * time.Hour.Seconds())),
+	NodeLifetimeDistr: NewExpDistr(1 / (61 * time.Hour.Seconds())),
 
 	NetworkLatency:  NewLogNormalDistr(.209,.157),// u metodi NextNetworkLatency dodano /10
 
@@ -31,7 +31,7 @@ var SimConfig = config {
 
 	MinerCount: 6,
 
-	SimMode: DISCOVERY,
+	SimMode: DEVp2p,
 
 	FastMode: true, //TODO: this
 
@@ -83,9 +83,9 @@ var LogConfig = logConfig {
 
 var MetricConfig  = metricConfig {
 
-	GroupFactor: 60,
+	GroupFactor: 30,
 
-	ExportType: PNG,
+	ExportType: CSV,
 
 	CollectType: Sum,
 
@@ -95,6 +95,12 @@ var MetricConfig  = metricConfig {
 	Metrics: metrics.DiscoveryMetrics[:],
 //	Metrics: metrics.DiscoveryMetrics[:],
 //	Metrics: metrics.AllTxPoolMetrics[:],
+
+	MetricCollectType: map[string]DataCollectType{
+		metrics.DiscoveryTable: 	Average,
+		metrics.DEVp2pPeers:		Average,
+		metrics.EthPeers:			Average,
+	},
 }
 
 

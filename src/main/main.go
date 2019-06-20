@@ -13,6 +13,7 @@ import (
 	"../util"
 	"github.com/agoussia/godes"
 	"math"
+	"math/rand"
 	"runtime"
 	sysTime "time"
 )
@@ -44,10 +45,10 @@ func newNodeConfig(bootstrapNodes []*network.Node) *network.NodeConfig {
 		EthereumConfig: &config.EthConfig,
 	}
 }
-
+var bootstrapNodeCount = 1
 func runBootstrapNodes() []*network.Node {
 
-	bootstrapNodes := make([]*network.Node, 1)
+	bootstrapNodes := make([]*network.Node, bootstrapNodeCount)
 
 	for i := 0; i < len(bootstrapNodes); i++{
 		bootstrapNodes[i] = network.NewBootstrapNode(newNodeConfig(bootstrapNodes))
@@ -128,8 +129,25 @@ func runSim(){
 
 	}
 
+	util.StartNewRunner(func() {
+		godes.Advance( 1 * 60 * 60)
+
+		c := config.SimConfig.NodeCount / 2
+
+		for c > 0 {
+			i := rand.Intn(len(nodes) - bootstrapNodeCount)
+			if nodes[i].IsOnline() {
+				nodes[i].Kill()
+				c--
+			}
+
+		}
+	})
+
+
 	waitForEnd(nodes)
 }
+
 
 func progressSimToEnd()  {
 	dif := config.SimConfig.SimulationTime - godes.GetSystemTime()
@@ -153,10 +171,9 @@ func progressSimToEnd()  {
 
 
 
-func waitForEnd(nodes []*network.Node)  {
+func waitForEnd(nodes []*network.Node) {
 
 	progressSimToEnd()
-
 
 	if godes.GetSystemTime() > config.SimConfig.SimulationTime {
 		config.SimConfig.SimulationTime = godes.GetSystemTime()
@@ -169,7 +186,13 @@ func waitForEnd(nodes []*network.Node)  {
 	godes.Clear()
 
 	showStats(nodes)
+	//showStats(nodes[0:len(nodes) - bootstrapNodeCount ])
 
+	if config.SimConfig.SimMode == config.ETHEREUM {
+		printBlockchainStats(nodes)
+	}
+}
+func printBlockchainStats(nodes []*network.Node)  {
 
 	es := nodes[0].Server().(*eth.Ethereum)
 	bc := es.BlockChain()
@@ -206,7 +229,6 @@ func waitForEnd(nodes []*network.Node)  {
 	util.Print("Total num of txs", total)
 	util.Print("BC size", size)
 }
-
 func findNodeByAddress(nodes []*network.Node, address common.Address) *network.Node {
 	for _, node := range nodes {
 		if node.Address() == address {
