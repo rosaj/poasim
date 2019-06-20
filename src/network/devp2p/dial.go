@@ -5,6 +5,7 @@ package devp2p
 import (
 	. "../../common"
 	. "../../config"
+	"../../metrics"
 	. "../../util"
 	"container/heap"
 	"errors"
@@ -29,7 +30,12 @@ const (
 	// Endpoint resolution is throttled with bounded backoff.
 	initialResolveDelay = 60 * time.Second
 	maxResolveDelay     = time.Hour
+
+
+	DialTask 		= metrics.DialTask
+	DiscoveryTask 	= metrics.DiscoveryTask
 )
+
 
 
 type dialstate struct {
@@ -78,6 +84,9 @@ func (tr *taskRunner) Run()  {
 }
 
 func RunTask(task task, server *Server, taskDone func())  {
+
+
+
 	tr := &taskRunner{&godes.Runner{},task, server, taskDone}
 	tasksMap[task] = tr
 	godes.AddRunner(tr)
@@ -308,6 +317,8 @@ func (s *dialstate) taskDone(t task, now float64) {
 
 func (t *dialTask) Do(srv *Server) {
 
+	srv.Update(DialTask)
+
 	err := t.dial(srv, t.dest)
 	if err != nil {
 		//log.Trace("Dial error", "task", t, "err", err)
@@ -383,6 +394,8 @@ func (t *dialTask) String() string {
 
 
 func (t *discoverTask) Do(srv *Server) {
+	srv.Update(DiscoveryTask)
+
 	// newTasks generates a lookup task whenever dynamic dials are
 	// necessary. Lookups need to take some time, otherwise the
 	// event loop spins too fast.

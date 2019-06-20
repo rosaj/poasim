@@ -83,7 +83,13 @@ var DiscoveryMetrics = [...]string{
 
 }
 
-const DEVp2pPeers = "DEVp2p peers"
+const (
+	DEVp2pPeers 			= "DEVp2p peers"
+	DEVp2pDisconnectedPeers = "Disconnected peers"
+	DialTask				= "Dial task"
+	DiscoveryTask			= "Discovery task"
+
+)
 
 
 
@@ -92,6 +98,9 @@ var DevP2PMetrics = [...]string{
 	DEVP2P_PONG,
 	DEVP2P_HANDSHAKE,
 	DEVp2pPeers,
+	DialTask,
+	DiscoveryTask,
+	DEVp2pDisconnectedPeers,
 }
 
 const 	(

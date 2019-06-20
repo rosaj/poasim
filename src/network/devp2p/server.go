@@ -18,6 +18,7 @@ const (
 	defaultDialRatio       = 3
 
 	PeerCount = metrics.DEVp2pPeers
+	DiscPeers = metrics.DEVp2pDisconnectedPeers
 )
 
 
@@ -401,6 +402,8 @@ func (srv *Server) DeletePeer(p *Peer)  {
 	srv.Refresh()
 
 	srv.logPeerStats()
+
+	srv.Update(DiscPeers)
 }
 
 func (srv *Server) FindPeer(node INode) IPeer {
