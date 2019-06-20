@@ -90,9 +90,10 @@ func Txs(broadcastNodes []*network.Node, actorCount int, txCount int, step float
 
 func TxsDistr(broadcastNodes []*network.Node)  {
 
-	txs(broadcastNodes, SimConfig.ActorCount, func(count int) (bool, float64) {
-		//return !SimConfig.SimulationEnded(), SimConfig.NextTrInterval()
-		return godes.GetSystemTime() + 60 < SimConfig.SimulationTime, SimConfig.NextTrInterval()
+	txGenConfig := SimConfig.TxGeneratorConfig
+
+	txs(broadcastNodes, txGenConfig.ActorCount, func(count int) (bool, float64) {
+		return godes.GetSystemTime() < txGenConfig.Duration.Seconds(), txGenConfig.NextTrInterval()
 	})
 }
 
@@ -124,27 +125,24 @@ func randomBroadcast(broadcastNodes []*network.Node, txs types.Transactions) int
 
 	errors := broadcastNodes[index].Server().GetProtocolManager().AddTxs(txs)
 	//util.Log("sending to ", broadcastNodes[index].Name())
+
 	errCount := 0
+
 	for _, err := range errors {
+
 		if err != nil {
 			errCount += 1
 			util.LogError(err)
 		}
 	}
+
 	return errCount
 
-/*
-	for _, node := range broadcastNodes {
-		fmt.Print(node.Name(), " pending txs ", node.Server().GetProtocolManager().PendingTxCount(), " ")
-	}
-	fmt.Println()
- */
 }
 
-var txCount = 0
 func newTransaction(from *ecdsa.PrivateKey, to common.Address, nonce uint64, amount	*big.Int) *types.Transaction {
-	txCount++
-	tx := types.NewTransaction(nonce, to, amount, 100000, big.NewInt(int64(txCount)), nil)
+	txPrice := SimConfig.TxGeneratorConfig.NextTxPrice()
+	tx := types.NewTransaction(nonce, to, amount, 100000, big.NewInt(int64(txPrice)), nil)
 	tx, _ = types.SignTx(tx, types.HomesteadSigner{}, from)
 	return tx
 }

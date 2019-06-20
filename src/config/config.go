@@ -47,20 +47,19 @@ type config struct {
 
 	MinerCount int
 
-	TransactionIntervalDistr Distribution
-
 	SimMode mode
 
-	ActorCount int
-
 	FastMode bool
+
+
+	TxGeneratorConfig txGeneratorConfig
 }
 
 type mode string
 
 var (
 	DISCOVERY 	= mode("Discovery")
-	SERVER		= mode("Server")
+	DEVp2p		= mode("DEVp2p")
 	ETHEREUM	= mode("ETHEREUM")
 )
 
@@ -108,7 +107,7 @@ var (
 type dataCollectType int
 var	(
 	Average		= dataCollectType(0)
-	Cumulative  = dataCollectType(1)
+	Sum			= dataCollectType(1)
 )
 
 type metricConfig struct {
@@ -123,6 +122,19 @@ type metricConfig struct {
 	CollectType dataCollectType
 
 }
+
+type txGeneratorConfig struct {
+
+	ActorCount int
+
+	Duration time.Duration
+
+	TransactionIntervalDistr Distribution
+
+	TxPriceDistr Distribution
+
+}
+
 
 type EthereumConfig struct {
 	ChainConfig *chainConfig
@@ -178,11 +190,18 @@ type minerConfig struct {
 	Recommit  time.Duration  // The time interval for miner to re-create mining work.
 }
 
-func (config *config) NextTrInterval() (interval float64) {
-	interval = config.TransactionIntervalDistr.nextValue()
+func (txGeneratorConfig *txGeneratorConfig) NextTrInterval() (interval float64) {
+	interval = txGeneratorConfig.TransactionIntervalDistr.nextValue()
 	//log.Print("TrInterval: ", interval)
 	return
 }
+
+func (txGeneratorConfig *txGeneratorConfig) NextTxPrice() (price float64) {
+	price = math.Max(txGeneratorConfig.TxPriceDistr.nextValue(), 1	)
+	//log.Print("TxPrice: ", price)
+	return
+}
+
 
 func (config *config) NextNetworkLatency() (interval float64) {
 	interval = config.NetworkLatency.nextValue() / 10

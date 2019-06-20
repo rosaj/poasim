@@ -11,19 +11,19 @@ var SimConfig = config {
 
 	SimulationTime: (1 * 6 * time.Hour).Seconds(),
 
-	NodeCount: 1000,
+	NodeCount: 100,
 
 	NodeStabilisationTime:  10 * time.Minute.Seconds(),
 
 	ChurnEnabled: true,
 
-	NodeArrivalDistr: NewNormalDistr((80*time.Minute.Seconds())/1000, (80*time.Minute.Seconds())/10000),
+	NodeArrivalDistr: NewNormalDistr((80*time.Minute.Seconds())/100, (80*time.Minute.Seconds())/1000),
 
 	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Hour).Seconds())),
 
 	NodeIntersessionTimeDistr: NewExpDistr( 1 / (1 * time.Minute).Seconds()),
 
-	NodeLifetimeDistr: NewExpDistr(1 / (4 * time.Hour.Seconds())),
+	NodeLifetimeDistr: NewExpDistr(1 / (6222222 * time.Hour.Seconds())),
 
 	NetworkLatency:  NewLogNormalDistr(.209,.157),// u metodi NextNetworkLatency dodano /10
 
@@ -31,13 +31,21 @@ var SimConfig = config {
 
 	MinerCount: 6,
 
-	TransactionIntervalDistr: NewExpDistr(1/0.04),
-
-	SimMode: SERVER,
-
-	ActorCount:  10000,
+	SimMode: DISCOVERY,
 
 	FastMode: true, //TODO: this
+
+	TxGeneratorConfig: txGeneratorConfig{
+
+		ActorCount: 10000,
+
+		TransactionIntervalDistr: NewExpDistr(1/0.05),
+
+		TxPriceDistr: NewNormalDistr(3, 1),
+
+		Duration: 30 * time.Minute,
+
+	},
 }
 
 var LogConfig = logConfig {
@@ -75,16 +83,16 @@ var LogConfig = logConfig {
 
 var MetricConfig  = metricConfig {
 
-	GroupFactor: 15,
+	GroupFactor: 60,
 
-	ExportType: CSV,
+	ExportType: PNG,
 
-	CollectType: Average,
+	CollectType: Sum,
 
 //	Metrics: append (make([]string, 0), metrics.GasLimit),
 	////	Metrics: metrics.TxPoolMetrics[:],
 //	Metrics: append(metrics.AllTxPoolMetrics[:], metrics.GasLimit),
-	Metrics: metrics.AllMetrics,
+	Metrics: metrics.DiscoveryMetrics[:],
 //	Metrics: metrics.DiscoveryMetrics[:],
 //	Metrics: metrics.AllTxPoolMetrics[:],
 }

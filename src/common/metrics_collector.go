@@ -34,6 +34,80 @@ func statFn(name string)  CalcFn {
 
 var GlobalMetricCollector = NewMetricCollector()
 
+
+type MetricCollector struct {
+	metrics	map[string]map[float64]*entry
+}
+
+func NewMetricCollector() *MetricCollector {
+	return newMetricCollector()
+}
+
+type entry struct {
+	sum int
+	count int
+}
+
+func newMetricCollector() *MetricCollector {
+	return &MetricCollector{
+		metrics: make(map[string]map[float64]*entry, 0),
+	}
+}
+
+func getTime() float64 {
+	return MetricConfig.GetTimeGroup()
+}
+func (mc *MetricCollector) ensureMetric(name string, numOfElems int)  {
+	t := getTime()
+
+	if  mc.metrics[name] == nil {
+		mc.metrics[name]= make(map[float64]*entry)
+	}
+	if mc.metrics[name][t] == nil {
+		 mc.metrics[name][t] = &entry{0, numOfElems}
+	}
+
+}
+func (mc *MetricCollector) UpdateWithValue(name string, value int) {
+	mc.ensureMetric(name, 1)
+	mc.metrics[name][getTime()].sum += value
+}
+
+func (mc *MetricCollector) Update(name string)  {
+	mc.UpdateWithValue(name, 1)
+}
+
+func (mc *MetricCollector) Set(name string, value int)  {
+	mc.ensureMetric(name, 0)
+	t := getTime()
+	mc.metrics[name][t].sum += value
+	mc.metrics[name][t].count++
+
+}
+
+
+
+func (mc *MetricCollector) Collect(name string) map[float64]float64 {
+	stats := make(map[float64]float64, 0)
+
+	for k, v := range mc.metrics[name] {
+		stats[k] = float64(v.sum)/float64(v.count)
+	}
+
+	return stats
+}
+
+
+func (mc *MetricCollector) Get(name string) map[float64]int {
+	stats := make(map[float64]int, 0)
+
+	for k, v := range mc.metrics[name] {
+		stats[k] = v.sum
+	}
+	return stats
+}
+
+/*
 type MetricCollector struct {
 	metrics	map[string]map[float64][]int
 }
@@ -107,3 +181,8 @@ func (mc *MetricCollector) Collect(name string) map[float64]float64 {
 
 	return stats
 }
+
+func (mc *MetricCollector) Get(name string) map[float64][]int {
+	return mc.metrics[name]
+}
+*/

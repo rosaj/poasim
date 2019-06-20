@@ -64,12 +64,11 @@ type Message struct {
 
 	responseTimeout float64
 }
-
 func (m *Message) Run() {
 
 	m.logSent()
 
-//	m.From.MarkMessageSend(m)
+	//m.From.MarkMessageSend(m)
 	m.From.Update(m.GetType())
 
 	godes.Advance(m.latency)

@@ -24,7 +24,7 @@ type INode interface {
 	GetUDP() IUdp
 	Server() IServer
 
-	//MarkMessageSend(m IMessage)
+//	MarkMessageSend(m IMessage)
 //	MarkMessageReceived(m IMessage)
 
 

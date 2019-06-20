@@ -246,7 +246,7 @@ func decodePrealloc() GenesisAlloc {
 
 var prealloc = decodePrealloc()
 
-var Actors = generateActors(config.SimConfig.ActorCount)
+var Actors = generateActors(config.SimConfig.TxGeneratorConfig.ActorCount)
 
 func newKey() *ecdsa.PrivateKey {
 	key, err := crypto.GenerateKey()

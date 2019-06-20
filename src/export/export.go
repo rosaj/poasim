@@ -3,13 +3,13 @@ package export
 import (
 	"../common"
 	"../config"
+	"fmt"
+
 	"../generate"
 	"../metrics"
 	. "../network"
 	"../util"
 	"encoding/csv"
-	"fmt"
-
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/plotutil"
@@ -42,6 +42,8 @@ func addPoints(vals map[float64]float64, key string, ptss map[string]plotter.XYs
 	}
 	ptss[key] = pts
 }
+
+
 func Stats(nodes []*Node)  {
 
 
@@ -68,7 +70,18 @@ func Stats(nodes []*Node)  {
 
 			}
 		}
+
 	}
+
+	/*
+	for k, v := range all {
+		t:=0.0
+		for _, v1 := range v {
+			t+=v1
+		}
+		util.Print(k, t)
+	}
+	*/
 
 
 	ptss := make(map[string]plotter.XYs)
@@ -86,7 +99,7 @@ func Stats(nodes []*Node)  {
 
 			addPoints(vals, key, ptss)
 
-		} else if config.MetricConfig.CollectType == config.Cumulative {
+		} else if config.MetricConfig.CollectType == config.Sum {
 
 			addPoints(value, key, ptss)
 		}
@@ -166,11 +179,13 @@ func Stats(nodes []*Node)  {
 
 	fmt.Println("wrote to", name)
 
+
 }
 
 func csvExport(data map[string]plotter.XYs, name string) error {
 
-	name = "test.csv"
+
+	name = "discovery.csv"
 
 	file, err := os.Create(name)
 	if err != nil {

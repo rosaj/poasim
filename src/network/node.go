@@ -216,11 +216,8 @@ func (n *Node) setOnline(online bool)  {
 /*
 
 func (n *Node) MarkMessageSend(m IMessage){
-	n.Set(m.GetType(), 1)
+	//n.Set(m.GetType(), 1)
 	n.addMsg(m, n.msgSent)
-}
-func (n *Node) MarkMessageReceived(m IMessage){
-	n.addMsg(m, n.msgReceived)
 }
 
 func (n *Node) addMsg(msg IMessage, msgMap map[string][]Msg)  {
@@ -229,6 +226,17 @@ func (n *Node) addMsg(msg IMessage, msgMap map[string][]Msg)  {
 	msgMap[msg.GetType()] = append(msgMap[msg.GetType()], Msg{t, 1})
 
 }
+
+func (n *Node) GetMessagesSent() map[string][]Msg  {
+	return n.msgSent
+}
+
+
+
+func (n *Node) MarkMessageReceived(m IMessage){
+	n.addMsg(m, n.msgReceived)
+}
+
 func (n *Node) GetMessagesSent(msgType string) int {
 	return n.msgSentCount[msgType]
 }
@@ -276,7 +284,7 @@ func (n *Node) startServer()  {
 	case DISCOVERY:
 		return
 
-	case SERVER:
+	case DEVp2p:
 		n.server = devp2p.NewServer(n, n)
 
 	case ETHEREUM:
