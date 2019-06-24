@@ -235,7 +235,7 @@ func (s *dialstate) newTasks(nRunning int, peers map[ID]*Peer, now float64) []ta
 	}
 
 
-	// Use random INodes from the table for half of the necessary
+	// Use random node from the table for half of the necessary
 	// dynamic dials.
 	randomCandidates := needDynDials / 2
 
@@ -266,7 +266,7 @@ func (s *dialstate) newTasks(nRunning int, peers map[ID]*Peer, now float64) []ta
 		newtasks = append(newtasks, &discoverTask{})
 	}
 
-	// Launch a timer to wait for the next INode to expire if all
+	// Launch a timer to wait for the next node to expire if all
 	// candidates have been tried and no task is currently active.
 	// This should prevent cases where the dialer logic is not ticked
 	// because there are no pending events.

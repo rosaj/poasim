@@ -21,7 +21,7 @@ var startTime sysTime.Time
 
 var c = 0
 
-func newNodeConfig(bootstrapNodes []*network.Node) *network.NodeConfig {
+func newNodeConfig(bootNodes []*network.Node) *network.NodeConfig {
 
 
 	protocols := make([]string, 0)
@@ -36,47 +36,48 @@ func newNodeConfig(bootstrapNodes []*network.Node) *network.NodeConfig {
 */
 
 	return &network.NodeConfig{
-		BootstrapNodes: bootstrapNodes,
+		BootNodes: bootNodes,
 		MaxPeers: config.SimConfig.MaxPeers,
+		DialRatio: config.SimConfig.DialRatio,
 		Protocols: protocols,
 		NetworkID: networkId,
 		EthereumConfig: &config.EthConfig,
 	}
 }
-var bootstrapNodeCount = 1
+var bootNodeCount = 1
 func runBootstrapNodes() []*network.Node {
 
-	bootstrapNodes := make([]*network.Node, bootstrapNodeCount)
+	bootNodes := make([]*network.Node, bootNodeCount)
 
-	for i := 0; i < len(bootstrapNodes); i++{
-		bootstrapNodes[i] = network.NewBootstrapNode(newNodeConfig(bootstrapNodes))
-		bootstrapNodes[i].NetworkID = 3
+	for i := 0; i < len(bootNodes); i++{
+		bootNodes[i] = network.NewBootstrapNode(newNodeConfig(bootNodes))
+		bootNodes[i].NetworkID = 3
 	}
 
-	for i := 0; i < len(bootstrapNodes); i++{
-		godes.AddRunner(bootstrapNodes[i])
+	for i := 0; i < len(bootNodes); i++{
+		godes.AddRunner(bootNodes[i])
 	}
 
 	godes.Run()
 
-	return bootstrapNodes
+	return bootNodes
 }
 
-func createNodes(bootstrapNodes []*network.Node, count int) []*network.Node {
+func createNodes(bootNodes []*network.Node, count int) []*network.Node {
 	core.Sealers = make([]INode, 0)
 
 	nodes := make([]*network.Node, count)
 
 	for i:=0 ; i < len(nodes); i++ {
-		nodes[i] = network.NewNode(newNodeConfig(bootstrapNodes))
+		nodes[i] = network.NewNode(newNodeConfig(bootNodes))
 		core.Sealers = append(core.Sealers, nodes[i])
 	}
 
 	return nodes
 }
 
-func createSimNodes(bootstrapNodes []*network.Node) []*network.Node  {
-	return createNodes(bootstrapNodes, config.SimConfig.NodeCount)
+func createSimNodes(bootNodes []*network.Node) []*network.Node  {
+	return createNodes(bootNodes, config.SimConfig.NodeCount)
 }
 
 func runNodes() []*network.Node {
@@ -118,17 +119,16 @@ func runSim(){
 
 	godes.Advance(config.SimConfig.NodeStabilisationTime)
 
+	godes.Advance(3 * 60)
+
+	//nodes[3].Kill()
+
 	if config.SimConfig.SimMode == config.BLOCKCHAIN {
-
-//		generate.AsyncTxs(nodes[:config.SimConfig.NodeCount], 1000, 36000, 0.08)
-
 		generate.AsyncTxsDistr(nodes[:config.SimConfig.NodeCount])
-
-
 	}
 
 
-//	ScenarioNodeLeavingNetwork(nodes[:len(nodes) - bootstrapNodeCount],  config.SimConfig.NodeCount/2, sysTime.Hour)
+//	ScenarioNodeLeavingNetwork(nodes[:len(nodes) - bootNodeCount],  config.SimConfig.NodeCount/2, sysTime.Hour)
 
 
 
@@ -174,7 +174,7 @@ func waitForEnd(nodes []*network.Node) {
 	godes.Clear()
 
 	showStats(nodes)
-	//showStats(nodes[0:len(nodes) - bootstrapNodeCount ])
+	//showStats(nodes[0:len(nodes) - bootNodeCount ])
 
 }
 

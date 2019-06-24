@@ -9,97 +9,67 @@ import (
 
 var SimConfig = config {
 
-	SimulationTime: (1 * 6 * time.Hour).Seconds(),
+	SimulationTime: (1 * 1 * time.Hour).Seconds(),
 
-	NodeCount: 100,
+	NodeCount: 6,
 
-	NodeStabilisationTime:  10 * time.Minute.Seconds(),
+	NodeStabilisationTime:  1 * time.Minute.Seconds(),
 
 	ChurnEnabled: true,
 
-	NodeArrivalDistr: NewNormalDistr((80*time.Minute.Seconds())/100, (80*time.Minute.Seconds())/1000),
+	NodeArrivalDistr: NewNormalDistr((13*time.Second.Seconds()), 0),
 
 	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Hour).Seconds())),
 
 	NodeIntersessionTimeDistr: NewExpDistr( 1 / (1 * time.Minute).Seconds()),
 
-	NodeLifetimeDistr: NewExpDistr(1 / (61 * time.Hour.Seconds())),
+	NodeLifetimeDistr: NewExpDistr(1 / (6111111 * time.Hour.Seconds())),
 
 	NetworkLatency:  NewLogNormalDistr(.209,.157),// u metodi NextNetworkLatency dodano /10
 
 	MaxPeers: 25,
 
-	SimMode: DEVp2p,
+	SimMode: BLOCKCHAIN,
 
 	FastMode: true, //TODO: this
 
 	TxGeneratorConfig: txGeneratorConfig{
 
-		ActorCount: 10000,
+		ActorCount: 1,
 
-		TransactionIntervalDistr: NewExpDistr(1/0.05),
+		//TransactionIntervalDistr: NewExpDistr(1/0.06),
+		TransactionIntervalDistr: NewNormalDistr(0.04, 0.01),
 
 		TxPriceDistr: NewNormalDistr(3, 1),
 
-		Duration: 30 * time.Minute,
+		Duration: 55 * time.Minute,
 
 	},
 }
 
-var LogConfig = logConfig {
-
-	Logging: false,
-
-	LogMessages: false,
-
-	LogDialing: false,
-
-	LogNode: false,
-
-	LogPeer: false,
-
-	LogDiscovery: false,
-
-	LogServer: false,
-
-	LogEthServer: false,
-
-	LogWorker: false,
-
-	LogConsensus: false,
-
-	LogProtocol: false,
-
-	LogBlockchain: false,
-
-	LogTxPool: false,
-
-	LogDownload: false,
-
-	LogDatabase: false,
-}
 
 var MetricConfig  = metricConfig {
 
-	GroupFactor: 30,
+	GroupFactor: 15,
 
-	ExportType: CSV,
+	ExportType: PNG,
 
-	CollectType: Sum,
+	CollectType: Average,
 
-//	Metrics: append (make([]string, 0), metrics.GasLimit),
-	////	Metrics: metrics.TxPoolMetrics[:],
-//	Metrics: append(metrics.AllTxPoolMetrics[:], metrics.GasLimit),
-//	Metrics: metrics.DiscoveryMetrics[:],
-//	Metrics: metrics.DiscoveryMetrics[:],
-//	Metrics: metrics.AllTxPoolMetrics[:],
-
-	Metrics: metrics.AllMetrics,
+//	Metrics: metrics.AllMetrics,
+	Metrics: []string{
+		metrics.TxsPerBlock,
+		metrics.TransactionUnderpriced,
+		metrics.NonceTooLow,
+		metrics.InsufficientFunds,
+	},
 
 	MetricCollectType: map[string]DataCollectType{
 		metrics.DiscoveryTable: 	Average,
 		metrics.DEVp2pPeers:		Average,
 		metrics.EthPeers:			Average,
+		metrics.MinedBlock:			Sum,
+		metrics.NEW_BLOCK_MSG:		Sum,
 	},
 }
 
@@ -161,4 +131,38 @@ var	defaultMinerConfig = &minerConfig {
 	GasCeil:  8000000,
 	GasPrice: big.NewInt(params.Wei),
 	Recommit: 3 * time.Second,
+}
+
+
+var LogConfig = logConfig {
+
+	Logging: false,
+
+	LogMessages: false,
+
+	LogDialing: false,
+
+	LogNode: false,
+
+	LogPeer: false,
+
+	LogDiscovery: false,
+
+	LogServer: false,
+
+	LogEthServer: false,
+
+	LogWorker: false,
+
+	LogConsensus: false,
+
+	LogProtocol: false,
+
+	LogBlockchain: false,
+
+	LogTxPool: false,
+
+	LogDownload: false,
+
+	LogDatabase: false,
 }

@@ -14,7 +14,7 @@ import (
 func ScenarioNodeLeavingNetwork(nodes []*network.Node, count int ,duration time.Duration)  {
 
 	util.StartNewRunner(func() {
-		godes.Advance( 1 * 60 * 60)
+		godes.Advance( duration.Seconds())
 
 
 		for count > 0 {

@@ -124,7 +124,8 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, ethConfig *config.Ethereum
 			Aura:   auraConfig,
 		},
 		Timestamp:  0,
-		GasLimit:   4700000,
+		//GasLimit:   4700000,
+		GasLimit: ethConfig.MinerConfig.GasFloor,
 		Difficulty: big.NewInt(1),
 		Alloc:      prealloc,
 	}

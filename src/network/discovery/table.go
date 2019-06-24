@@ -470,7 +470,7 @@ func (tab *Table) loadSeedNodes() {
 	nodes = append(nodes, tab.nursery...)
 	for i := range nodes {
 		seed := nodes[i]
-		//tab.log("Load boostrap node: ", seed.Name())
+		//tab.log("Load boot node: ", seed.Name())
 		tab.addSeenNode(seed)
 	}
 }

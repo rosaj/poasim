@@ -222,11 +222,13 @@ func Stats(nodes []*Node)  {
 
 func csvExport(data map[string]plotter.XYs, name string) error {
 
+	//name = "eth.csv"
+
 	dir, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
 	}
-	name = dir + "/src/res/discovery.csv"
+	name = dir + "/src/res/" + name
 
 	file, err := os.Create(name)
 	if err != nil {

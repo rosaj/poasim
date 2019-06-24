@@ -34,7 +34,6 @@ import (
 	"../eth/miner"
 	"../eth/params"
 	"fmt"
-	"github.com/agoussia/godes"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/crypto"
 	"math/big"
@@ -313,9 +312,16 @@ func (s *Ethereum) StartMining() error {
 		// introduced to speed sync times.
 		atomic.StoreUint32(&s.protocolManager.acceptTxs, 1)
 
+
 		s.miner.SetEtherbase(eb)
+
+
+		if minersStarted > 0 {
+			return nil
+		}
+		minersStarted = 1
 		StartNewRunner(func() {
-			godes.Advance(30)
+			//godes.Advance(30)
 			s.miner.Start(eb)
 			s.log("Starting to mine")
 		})
@@ -326,6 +332,7 @@ func (s *Ethereum) StartMining() error {
 	return nil
 }
 
+var minersStarted = 0
 
 func (s *Ethereum) SetOnline(online bool)  {
 	//Print(s.Self().Name(), "ETHEREUM ONLINE", online)

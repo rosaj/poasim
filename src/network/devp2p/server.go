@@ -40,9 +40,9 @@ type Config struct {
 	// Disabling is useful for protocol debugging (manual topology).
 	NoDiscovery bool
 
-	// BootstrapINodes are used to establish connectivity
+	// BootNodes are used to establish connectivity
 	// with the rest of the network.
-	BootstrapINodes []INode
+	BootNodes []INode
 
 	// Static INodes are used as pre-configured connections which are always
 	// maintained and re-connected on disconnects.
@@ -95,7 +95,7 @@ func NewServer(node INode, metricCollector IMetricCollector) *Server {
 				Config : Config {
 					MaxPeers: node.GetMaxPeers(),
 					DialRatio: node.GetDialRatio(),
-					BootstrapINodes: node.GetBootstrapNodes(),
+					BootNodes: node.GetBootNodes(),
 				},
 			}
 
@@ -167,7 +167,7 @@ func (srv *Server) Start() {
 	srv.setupDiscovery()
 
 	dynPeers := srv.maxDialedConns()
-	dialer := newDialState(srv.Self().ID(), srv.StaticINodes, srv.BootstrapINodes, srv.ntab, dynPeers)
+	dialer := newDialState(srv.Self().ID(), srv.StaticINodes, srv.BootNodes, srv.ntab, dynPeers)
 
 	srv.log("DynPeers:", dynPeers)
 	srv.run(dialer)
@@ -292,7 +292,7 @@ func (srv *Server) SetupConn(flags connFlag, node INode) error {
 	peer := NewPeer(srv, node)
 	peer.flags = flags
 /*
-	if srv.trusted[INode.ID()] {
+	if srv.trusted[node.ID()] {
 		// Ensure that the trusted flag is set before checking against MaxPeers.
 		peer.flags |= trustedConn
 	}

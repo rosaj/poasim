@@ -45,7 +45,7 @@ type NodeConfig struct {
 
 	DialRatio 		int
 
-	BootstrapNodes 	[]*Node
+	BootNodes 	[]*Node
 
 	NetworkID		int
 
@@ -160,9 +160,9 @@ func (n *Node) GetDialRatio() int {
 	return n.DialRatio
 }
 
-func (n *Node) GetBootstrapNodes() []INode {
+func (n *Node) GetBootNodes() []INode {
 	bNodes := make([]INode, 0)
-	for _, bNode := range n.BootstrapNodes {
+	for _, bNode := range n.BootNodes {
 		bNodes = append(bNodes, bNode)
 	}
 	return bNodes
@@ -373,9 +373,9 @@ func (n *Node) Run() {
 
 	if !n.isBootstrapNode {
 		n.startServer()
+		nodeCountChanged(true)
 	}
 
-	nodeCountChanged(true)
 
 	n.waitForEnd()
 

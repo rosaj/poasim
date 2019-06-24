@@ -89,7 +89,7 @@ type ChainConfig struct {
 
 	Clique *CliqueConfig `json:"clique,omitempty"`
 
-	Aura *AuraConfig
+	Aura *AuraConfig `json:"aura,omitempty"`
 }
 
 

@@ -83,7 +83,7 @@ func NewUDP(node INode, metricCollector IMetricCollector) (*Table, *UDP) {
 		node:       	 node,
 		db:              newDB(),
 	}
-	tab := newTable(metricCollector, udp, node.GetBootstrapNodes())
+	tab := newTable(metricCollector, udp, node.GetBootNodes())
 	udp.tab = tab
 
 	return udp.tab, udp

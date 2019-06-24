@@ -45,6 +45,8 @@ type config struct {
 
 	MaxPeers int
 
+	DialRatio int
+
 	SimMode mode
 
 	FastMode bool
@@ -184,12 +186,14 @@ type txPoolConfig struct {
 	Lifetime time.Duration // Maximum amount of time non-executable transaction are queued
 }
 
+
 type minerConfig struct {
 	GasFloor  uint64         // Target gas floor for mined blocks.
 	GasCeil   uint64         // Target gas ceiling for mined blocks.
 	GasPrice  *big.Int       // Minimum gas price for mining a transaction
 	Recommit  time.Duration  // The time interval for miner to re-create mining work.
 }
+
 
 func (txGeneratorConfig *txGeneratorConfig) NextTrInterval() (interval float64) {
 	interval = txGeneratorConfig.TransactionIntervalDistr.nextValue()

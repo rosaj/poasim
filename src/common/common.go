@@ -30,7 +30,7 @@ type INode interface {
 
 	GetMaxPeers() int
 	GetDialRatio() int
-	GetBootstrapNodes() []INode
+	GetBootNodes() []INode
 	GetNetworkID() int
 	GetProtocols() []string
 
