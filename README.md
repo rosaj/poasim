@@ -1,4 +1,4 @@
-# Blockchain simulator
+# PoASim - Blockchain simulator
 Blockchain simulator implemented in Golang. Based on [godes library](https://github.com/agoussia/godes)
 
 ## Required packages
