@@ -12,7 +12,7 @@ import (
 // Tako da se sada moze u config datoteci samo promjenit ime i parametri za neku od
 // distribucija simulacije, drugo ne treba nis dirat
 
-var repetition = true
+var repetition = false
 
 func NewExpDistr(lambda float64) *ExpDistr {
 	return &ExpDistr{ godes.NewExpDistr(repetition), lambda}

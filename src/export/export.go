@@ -199,7 +199,8 @@ func Stats(nodes []*Node)  {
 
 	exportType := config.MetricConfig.ExportType
 
-	name := fmt.Sprintf("msg_%s_%s_%s.%s",
+	name := fmt.Sprintf("%s_%s_%s_%s.%s",
+		config.SimConfig.SimMode,
 		util.ToDuration(config.SimConfig.SimulationTime).String(),
 		strconv.Itoa(config.SimConfig.NodeCount),
 		strconv.Itoa(int(config.MetricConfig.GroupFactor)),

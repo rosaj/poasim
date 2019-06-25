@@ -14,12 +14,13 @@ import (
 	"math/big"
 	"math/rand"
 )
+var txStats = GlobalMetricCollector
 
 func GetTxsStats() map[float64]float64 {
 	return txStats.Collect(metrics.TxsArrival)
 }
 
-var txStats = GlobalMetricCollector
+
 var	nonceCounter = make(map[common.Address]uint64)
 
 func txs(broadcastNodes []*network.Node,  actorCount int, stepFunc func(count int) (bool, float64))  {
@@ -41,7 +42,11 @@ func txs(broadcastNodes []*network.Node,  actorCount int, stepFunc func(count in
 		tx := newTransaction(actors[addr], core.BankAddress, nonceCounter[addr], big.NewInt(1))
 		nonceCounter[addr]+=1
 
-		errCount += randomBroadcast(broadcastNodes, append(make(types.Transactions, 0), tx))
+		if errors := randomBroadcast(broadcastNodes, append(make(types.Transactions, 0), tx)); errors > 0 {
+			nonceCounter[addr]-=1
+			errCount += errCount
+		}
+
 
 		if step > 0 {
 			godes.Advance(step)
@@ -60,40 +65,15 @@ func Txs(broadcastNodes []*network.Node, actorCount int, txCount int, step float
 	txs(broadcastNodes, actorCount, func(count int) (bool, float64) {
 		return count < txCount, step
 	})
-
-/*
-	//actors := generateActors(actorCount)
-	actors := core.Actors
-	actorsAddrs := make([]common.Address, 0)
-	for addr := range actors {
-		actorsAddrs = append(actorsAddrs, addr)
-	}
-
-//	donate(broadcastNodes, actorsAddrs)
-
-	for i := 0; i < txCount; i += 1 {
-		nextActor := rand.Intn(actorCount)
-
-		addr := actorsAddrs[nextActor]
-
-		tx := newTransaction(actors[addr], core.BankAddress, nonceCounter[addr], big.NewInt(1))
-		nonceCounter[addr]+=1
-
-		randomBroadcast(broadcastNodes, append(make(types.Transactions, 0), tx))
-
-		if step > 0 {
-			godes.Advance(step)
-		}
-	}
-*/
 }
 
 func TxsDistr(broadcastNodes []*network.Node)  {
 
-	txGenConfig := SimConfig.TxGeneratorConfig
+	startTime := godes.GetSystemTime()
 
+	txGenConfig := SimConfig.TxGeneratorConfig
 	txs(broadcastNodes, txGenConfig.ActorCount, func(count int) (bool, float64) {
-		return godes.GetSystemTime() < txGenConfig.Duration.Seconds(), txGenConfig.NextTrInterval()
+		return util.TimeSince(uint64(startTime)) < txGenConfig.Duration, txGenConfig.NextTrInterval()
 	})
 }
 

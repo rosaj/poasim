@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+
 func ScenarioNodeLeavingNetwork(nodes []*network.Node, count int ,duration time.Duration)  {
 
 	util.StartNewRunner(func() {
@@ -32,7 +33,7 @@ func ScenarioNodeLeavingNetwork(nodes []*network.Node, count int ,duration time.
 
 
 
-func PrintBlockchainStats(nodes []*network.Node)  {
+func PrintBlockchainStats(nodes []*network.Node, printAllBlocks bool)  {
 
 	es := nodes[0].Server().(*eth.Ethereum)
 	bc := es.BlockChain()
@@ -55,8 +56,9 @@ func PrintBlockchainStats(nodes []*network.Node)  {
 				util.LogError(err)
 			}
 			signer := findNodeByAddress(nodes, signAddr)
-
-			util.Print(block.Number(), "tx count", block.Transactions().Len(), "signer", signer)
+			if printAllBlocks {
+				util.Print(block.Number(), "tx count", block.Transactions().Len(), "signer", signer)
+			}
 			size += block.Size()
 			size += block.Header().Size()
 

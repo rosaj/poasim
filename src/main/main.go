@@ -119,9 +119,6 @@ func runSim(){
 
 	godes.Advance(config.SimConfig.NodeStabilisationTime)
 
-	godes.Advance(3 * 60)
-
-	//nodes[3].Kill()
 
 	if config.SimConfig.SimMode == config.BLOCKCHAIN {
 		generate.AsyncTxsDistr(nodes[:config.SimConfig.NodeCount])
@@ -129,7 +126,6 @@ func runSim(){
 
 
 //	ScenarioNodeLeavingNetwork(nodes[:len(nodes) - bootNodeCount],  config.SimConfig.NodeCount/2, sysTime.Hour)
-
 
 
 
@@ -182,12 +178,11 @@ func showStats(nodes []*network.Node)  {
 	export.Stats(nodes)
 
 	if config.SimConfig.SimMode == config.BLOCKCHAIN {
-		PrintBlockchainStats(nodes)
+		PrintBlockchainStats(nodes, false)
 	}
 }
 
 
 func main()  {
 	runSim()
-	//export.Test()
 }

@@ -55,12 +55,12 @@ type config struct {
 	TxGeneratorConfig txGeneratorConfig
 }
 
-type mode int
+type mode string
 
 var (
-	DISCOVERY 	= mode(0)
-	DEVp2p		= mode(1)
-	BLOCKCHAIN	= mode(2)
+	DISCOVERY 	= mode("rlpx")
+	DEVp2p		= mode("devp2p")
+	BLOCKCHAIN	= mode("bc")
 )
 
 
