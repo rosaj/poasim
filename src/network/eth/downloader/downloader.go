@@ -236,7 +236,6 @@ func (d *Downloader) syncWithPeer(p Peer, hash common.Hash, td *big.Int) (err er
 		}
 	}()
 
-	d.log("Synchronising with the network", "peer", p)
 	defer func(start float64) {
 		d.log("Synchronisation terminated", "elapsed", TimeSince(uint64(start)))
 	}(godes.GetSystemTime())
@@ -253,14 +252,18 @@ func (d *Downloader) syncWithPeer(p Peer, hash common.Hash, td *big.Int) (err er
 
 	d.log("Mine height", localHeight, "peer height", height)
 
-	if localHeight >= height {
+/*	if localHeight >= height {
 		return nil
 	}
+
+ */
+	d.log("Synchronising with the network", "peer", p)
 
 	hashes := make([]common.Hash, 0)
 	headerHashes := make(map[common.Hash]*types.Header,0)
 
-	for i := localHeight+1; i <= height ; i+=1 {
+//	for i := localHeight+1; i <= height ; i+=1 {
+	for i := localHeight; i <= height ; i+=1 {
 		godes.Advance(SimConfig.NextNetworkLatency())
 
 		headers, err := p.GetHeadersByNumber(i, MaxHeaderFetch, 0, false)
@@ -299,7 +302,7 @@ func (d *Downloader) syncWithPeer(p Peer, hash common.Hash, td *big.Int) (err er
 			return errInvalidBody
 		}
 		blocks[i] = types.NewBlockWithHeader(header).WithBody(result.Transactions, result.Uncles)
-		d.log("Created block", blocks[i].NumberU64())
+	//	d.log("Created block", blocks[i].NumberU64())
 	}
 
 	if index, err := d.blockchain.InsertChain(blocks); err != nil {
@@ -370,7 +373,7 @@ func (d *Downloader) DeliverHeaders(id ID, headers []*types.Header) (err error) 
 
 func (d *Downloader) log(a ...interface{})  {
 	if LogConfig.LogDownload {
-		Print("Downloader", d.name, a)
+		Log("Downloader", d.name, a)
 	}
 }
 

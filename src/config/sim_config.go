@@ -11,11 +11,11 @@ var SimConfig = config {
 
 	SimulationTime: (1 * 1 * time.Hour).Seconds(),
 
-	NodeCount: 6,
+	NodeCount: 100,
 
 	NodeStabilisationTime:  1 * time.Minute.Seconds(),
 
-	ChurnEnabled: true,
+	ChurnEnabled: false,
 
 	NodeArrivalDistr: NewNormalDistr((13*time.Second.Seconds()), 0),
 
@@ -27,7 +27,7 @@ var SimConfig = config {
 
 	NetworkLatency:  NewLogNormalDistr(.209,.157),// u metodi NextNetworkLatency dodano /10
 
-	MaxPeers: 25,
+	MaxPeers: 50,
 
 	SimMode: BLOCKCHAIN,
 
@@ -35,14 +35,14 @@ var SimConfig = config {
 
 	TxGeneratorConfig: txGeneratorConfig{
 
-		ActorCount: 1,
+		ActorCount: 1000,
 
 		//TransactionIntervalDistr: NewExpDistr(1/0.06),
 		TransactionIntervalDistr: NewNormalDistr(0.04, 0.01),
 
 		TxPriceDistr: NewNormalDistr(3, 1),
 
-		Duration: 55 * time.Minute,
+		Duration: 0 * time.Minute,
 
 	},
 }
@@ -58,10 +58,11 @@ var MetricConfig  = metricConfig {
 
 //	Metrics: metrics.AllMetrics,
 	Metrics: []string{
-		metrics.TxsPerBlock,
-		metrics.TransactionUnderpriced,
-		metrics.NonceTooLow,
-		metrics.InsufficientFunds,
+		metrics.MinedBlock,
+//		metrics.TxsPerBlock,
+//		metrics.TransactionUnderpriced,
+//		metrics.NonceTooLow,
+//		metrics.InsufficientFunds,
 	},
 
 	MetricCollectType: map[string]DataCollectType{
@@ -82,7 +83,7 @@ var EthConfig = EthereumConfig {
 
 
 var ChainConfig = &chainConfig {
-	Engine:	CLIQUE,
+	Engine:	AURA,
 	Clique: & CliqueConfig {
 		Period: 15,
 		Epoch:	30000,
@@ -152,7 +153,7 @@ var LogConfig = logConfig {
 
 	LogEthServer: false,
 
-	LogWorker: false,
+	LogWorker: true,
 
 	LogConsensus: false,
 
@@ -162,7 +163,7 @@ var LogConfig = logConfig {
 
 	LogTxPool: false,
 
-	LogDownload: false,
+	LogDownload: true,
 
 	LogDatabase: false,
 }
