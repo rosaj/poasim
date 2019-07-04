@@ -112,7 +112,7 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, ethConfig *config.Ethereum
 		auraConfig = &params.AuraConfig {
 			Difficulty: big.NewInt(1),
 			Period: conf.Aura.Period,
-			Epoch:  conf.Aura.Epoch,
+			//Epoch:  conf.Aura.Epoch,
 		}
 	} else {
 		panic("No consensus engine set")

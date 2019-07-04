@@ -11,11 +11,11 @@ var SimConfig = config {
 
 	SimulationTime: (1 * 1 * time.Hour).Seconds(),
 
-	NodeCount: 100,
+	NodeCount: 6,
 
 	NodeStabilisationTime:  1 * time.Minute.Seconds(),
 
-	ChurnEnabled: false,
+	ChurnEnabled: true,
 
 	NodeArrivalDistr: NewNormalDistr((13*time.Second.Seconds()), 0),
 
@@ -52,18 +52,18 @@ var MetricConfig  = metricConfig {
 
 	GroupFactor: 15,
 
-	ExportType: PNG,
+	ExportType: CSV,
 
 	CollectType: Average,
 
-//	Metrics: metrics.AllMetrics,
-	Metrics: []string{
-		metrics.MinedBlock,
+	Metrics: metrics.AllMetrics,
+//	Metrics: []string{
+//		metrics.MinedBlock,
 //		metrics.TxsPerBlock,
 //		metrics.TransactionUnderpriced,
 //		metrics.NonceTooLow,
 //		metrics.InsufficientFunds,
-	},
+//	},
 
 	MetricCollectType: map[string]DataCollectType{
 		metrics.DiscoveryTable: 	Average,
@@ -83,14 +83,13 @@ var EthConfig = EthereumConfig {
 
 
 var ChainConfig = &chainConfig {
-	Engine:	AURA,
+	Engine:	CLIQUE,
 	Clique: & CliqueConfig {
 		Period: 15,
 		Epoch:	30000,
 	},
 	Aura:	&AuraConfig {
 		Period: 15,
-		Epoch:  30000,
 	},
 }
 

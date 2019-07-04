@@ -164,7 +164,6 @@ type CliqueConfig struct {
 // AuraConfig is the consensus engine configs for proof-of-authority based sealing.
 type AuraConfig struct {
 	Period uint64 // Number of seconds between blocks to enforce
-	Epoch  uint64 // Epoch length to reset votes and checkpoint
 }
 
 type ConsensusEngine int
