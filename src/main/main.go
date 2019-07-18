@@ -1,5 +1,7 @@
 package main
 
+import "C"
+
 import (
 	. "../common"
 	"../config"
@@ -108,7 +110,9 @@ func runNodes() []*network.Node {
 func logProgress(a ...interface{})  {
 	util.Print(math.Round((godes.GetSystemTime()/config.SimConfig.SimulationTime)*100), "% elapsed:", sysTime.Since(startTime), a)
 }
-func runSim(){
+
+//export RunSim
+func RunSim() int {
 
 	runtime.GOMAXPROCS(1)
 
@@ -124,12 +128,26 @@ func runSim(){
 		generate.AsyncTxsDistr(nodes[:config.SimConfig.NodeCount])
 	}
 
-
+	/*
+	godes.Advance(60*5)
+	for _, node := range nodes {
+		util.Print(node.Name())
+		if node.Server() == nil {
+			continue
+		}
+		for _, peer := range node.GetDEVp2pPeers() {
+			fmt.Print(peer.Name(), ", ")
+		}
+		fmt.Println("")
+	}
+	*/
 //	ScenarioNodeLeavingNetwork(nodes[:len(nodes) - bootNodeCount],  config.SimConfig.NodeCount/2, sysTime.Hour)
 
 
 
 	waitForEnd(nodes)
+
+	return c
 }
 
 
@@ -184,5 +202,8 @@ func showStats(nodes []*network.Node)  {
 
 
 func main()  {
-	runSim()
+	//RunSim()
 }
+
+
+//go build -o poasim.so -buildmode=c-shared src/main/main.go

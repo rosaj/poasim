@@ -156,6 +156,10 @@ func (n *Node) GetMaxPeers() int {
 	return n.MaxPeers
 }
 
+func (n *Node) GetDEVp2pPeers() []INode {
+	return n.Server().Peers()
+}
+
 func (n *Node) GetDialRatio() int {
 	return n.DialRatio
 }

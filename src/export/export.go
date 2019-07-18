@@ -194,7 +194,7 @@ func Stats(nodes []*Node)  {
 
 	p.NominalX(xNames...)
 
-	fmt.Println("Points prepared")
+	util.Print("Points prepared")
 
 
 	exportType := config.MetricConfig.ExportType
@@ -216,14 +216,14 @@ func Stats(nodes []*Node)  {
 	}
 
 
-	fmt.Println("wrote to", name)
+	util.Print("wrote to", name)
 
 
 }
 
 func csvExport(data map[string]plotter.XYs, name string) error {
 
-	name = "eth.csv"
+	//name = "eth.csv"
 
 	dir, err := os.Getwd()
 	if err != nil {

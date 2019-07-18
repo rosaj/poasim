@@ -63,6 +63,7 @@ type IServer interface {
 	Stop()
 	RetrieveHandshakePeer(node INode) IPeer
 	FindPeer(node INode) IPeer
+	Peers() []INode
 	GetProtocols() []IProtocol
 	SetupPeerConn(connFlags int32, node INode) error
 	SetOnline(online bool)

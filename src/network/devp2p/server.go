@@ -412,7 +412,15 @@ func (srv *Server) FindPeer(node INode) IPeer {
 func (srv *Server) PeerCount() int {
 	return len(srv.peers)
 }
+func (srv *Server) Peers() []INode  {
+	peers := make([]INode, 0)
 
+	for _, peer := range srv.peers {
+		peers = append(peers, peer.Node())
+	}
+
+	return peers
+}
 
 func (srv *Server) protoHandshakeChecks(p *Peer) error {
 	// Drop connections with no matching protocols.

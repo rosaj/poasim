@@ -11,11 +11,11 @@ var SimConfig = config {
 
 	SimulationTime: (1 * 1 * time.Hour).Seconds(),
 
-	NodeCount: 6,
+	NodeCount: 60,
 
 	NodeStabilisationTime:  1 * time.Minute.Seconds(),
 
-	ChurnEnabled: true,
+	ChurnEnabled: false,
 
 	NodeArrivalDistr: NewNormalDistr((13*time.Second.Seconds()), 0),
 
@@ -27,13 +27,11 @@ var SimConfig = config {
 
 	NetworkLatency:  NewLogNormalDistr(.209,.157),// u metodi NextNetworkLatency dodano /10
 
-	MaxPeers: 50,
+	MaxPeers: 25,
 
 	SimMode: BLOCKCHAIN,
 
-	FastMode: true, //TODO: this
-
-	TxGeneratorConfig: txGeneratorConfig{
+	TxGeneratorConfig: txGeneratorConfig {
 
 		ActorCount: 1000,
 
