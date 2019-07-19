@@ -428,8 +428,8 @@ func (pm *ProtocolManager) HandleNewBlockMsg(p *peer, m *Message)  {
 	request.Block.ReceivedFrom = p
 
 	pm.log("HandleNewBlockMsg", p, "number:",request.Block.NumberU64())
-
-
+	author := pm.blockchain.Engine().AuthorName(request.Block.Header())
+	Log(pm, "Importing", request.Block.Number(), "with td", request.Block.Difficulty(),  "from signer", author)
 	// Mark the peer as owning the block and schedule it for import
 	p.MarkBlock(request.Block.Hash())
 	pm.fetcher.Enqueue(p, request.Block)

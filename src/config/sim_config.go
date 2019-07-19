@@ -9,9 +9,9 @@ import (
 
 var SimConfig = config {
 
-	SimulationTime: (1 * 1 * time.Hour).Seconds(),
+	SimulationTime: (1 * 7 * time.Minute).Seconds(),
 
-	NodeCount: 60,
+	NodeCount: 29,
 
 	NodeStabilisationTime:  1 * time.Minute.Seconds(),
 
@@ -134,7 +134,7 @@ var	defaultMinerConfig = &minerConfig {
 
 var LogConfig = logConfig {
 
-	Logging: false,
+	Logging: true,
 
 	LogMessages: false,
 

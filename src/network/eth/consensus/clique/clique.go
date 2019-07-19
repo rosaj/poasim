@@ -167,6 +167,7 @@ func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, er
 	sigcache.Add(hash, signer)
 	return signer, nil
 }
+var signers = make(map[common.Address]string)
 
 // Clique is the proof-of-authority consensus engine proposed to support the
 // Ethereum testnet following the Ropsten attacks.
@@ -185,6 +186,7 @@ type Clique struct {
 
 	// The fields below are for testing only
 	fakeDiff bool // Skip difficulty verifications
+
 }
 
 // New creates a Clique proof-of-authority consensus engine with the initial
@@ -213,6 +215,11 @@ func New(name string, config *params.CliqueConfig, db ethdb.Database) *Clique {
 // from the signature in the header's extra-data section.
 func (c *Clique) Author(header *types.Header) (common.Address, error) {
 	return ecrecover(header, c.signatures)
+}
+
+func (c *Clique) AuthorName(header *types.Header) string {
+	author, _ := c.Author(header)
+	return signers[author]
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules.
@@ -636,6 +643,7 @@ func (c *Clique) Seal(chain consensus.ChainReader, block *types.Block, results f
 
 	c.log("Sealed block", block.NumberU64())
 	//Print("Clique", c.name, "Sealed block", block.NumberU64())
+	signers[signer] = c.name
 	results(block.WithSeal(header))
 
 	return nil

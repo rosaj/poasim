@@ -143,8 +143,6 @@ func RunSim() int {
 	*/
 //	ScenarioNodeLeavingNetwork(nodes[:len(nodes) - bootNodeCount],  config.SimConfig.NodeCount/2, sysTime.Hour)
 
-
-
 	waitForEnd(nodes)
 
 	return c
@@ -202,7 +200,7 @@ func showStats(nodes []*network.Node)  {
 
 
 func main()  {
-	//RunSim()
+	RunSim()
 }
 
 

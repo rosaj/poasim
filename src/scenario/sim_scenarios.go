@@ -44,7 +44,7 @@ func PrintBlockchainStats(nodes []*network.Node, printAllBlocks bool)  {
 
 	for i := 0; i < config.SimConfig.NodeCount ; i+=1  {
 		ob := nodes[i].Server().(*eth.Ethereum).BlockChain().CurrentBlock()
-		util.Print(i, ob.NumberU64())
+		util.Print(nodes[i].Name(), ob.NumberU64())
 	}
 	size := common.StorageSize(0)
 	total := 0

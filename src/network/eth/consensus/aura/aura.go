@@ -198,6 +198,10 @@ func (a *Aura) Author(header *types.Header) (common.Address, error) {
 	return ecrecover(header, a.signatures)
 }
 
+func (c *Aura) AuthorName(header *types.Header) string {
+	return ""
+}
+
 // VerifyHeader checks whether a header conforms to the consensus rules.
 func (a *Aura) VerifyHeader(chain consensus.ChainReader, header *types.Header, seal bool) error {
 	return a.verifyHeader(chain, header, nil)
