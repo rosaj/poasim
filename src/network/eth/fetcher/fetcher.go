@@ -20,12 +20,15 @@ package fetcher
 import (
 	. "../../../common"
 	. "../../../config"
+	"../../../network/message"
 	. "../../../util"
 	"../common"
 	"../consensus"
 	"../core/types"
+	"../downloader"
 	"errors"
 	"fmt"
+	"github.com/agoussia/godes"
 	"time"
 )
 
@@ -47,10 +50,10 @@ var (
 type blockRetrievalFn func(common.Hash) *types.Block
 
 // headerRequesterFn is a callback type for sending a header retrieval request.
-type headerRequesterFn func(common.Hash) error
+type headerRequesterFn func(common.Hash) (*types.Header, error)
 
 // bodyRequesterFn is a callback type for sending a body retrieval request.
-type bodyRequesterFn func([]common.Hash) error
+type bodyRequesterFn func([]common.Hash)  (map[common.Hash]*types.Body, error)
 
 // headerVerifierFn is a callback type to verify a block's header for fast propagation.
 type headerVerifierFn func(header *types.Header) error
@@ -146,6 +149,39 @@ func (f *Fetcher) insert(peer IPeer, block *types.Block) error {
 	f.broadcastBlock(block, false)
 
 	return nil
+}
+
+func (f *Fetcher) Notify(peer IPeer, hash common.Hash, number uint64,
+	headerFetcher headerRequesterFn, bodyFetcher bodyRequesterFn) {
+
+	godes.Advance(arriveTimeout.Seconds())
+
+	if f.getBlock(hash) != nil {
+		return
+	}
+
+	godes.Advance(SimConfig.NextNetworkLatency() * 2)
+
+	header, err := headerFetcher(hash)
+	if err != nil {
+		return
+	}
+
+
+	results, err := bodyFetcher(append(make([]common.Hash, 0), header.Hash()))
+	if err != nil {
+		return
+	}
+
+	godes.Advance(message.CalculateSizeLatency(downloader.CalcBodysSize(results)))
+
+	body :=  results[header.Hash()]
+
+	block := types.NewBlockWithHeader(header).WithBody(body.Transactions, body.Uncles)
+	block.ReceivedAt = uint64(godes.GetSystemTime())
+
+	f.Enqueue(peer, block)
+
 }
 
 func (f *Fetcher) log(a ...interface{})  {

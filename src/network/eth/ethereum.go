@@ -321,8 +321,8 @@ func (s *Ethereum) StartMining() error {
 		}
 		minersStarted = 1
 		StartNewRunner(func() {
-			//godes.Advance(30)
-			s.miner.Start(eb)
+		//	godes.Advance(float64(SimConfig.NodeCount) * SimConfig.NextNodeArrival())
+//			s.miner.Start(eb)
 			s.log("Starting to mine")
 		})
 

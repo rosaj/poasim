@@ -346,6 +346,21 @@ func (p *peer) GetHeadersByHash(origin common.Hash, amount int, skip int, revers
 
 	return nil, errEthPeerClosed
 }
+
+func (p *peer) GetHeight() uint64 {
+	if otherPeer := p.nodesEthPeer(); otherPeer != nil {
+		return otherPeer.pm.blockchain.CurrentBlock().NumberU64()
+	}
+	return 0
+}
+func (p *peer) GetBlock(number uint64) *types.Block {
+	if otherPeer := p.nodesEthPeer(); otherPeer != nil {
+		return otherPeer.pm.blockchain.GetBlockByNumber(number)
+	}
+
+	return nil
+}
+
 func (p *peer) GetHeadersByNumber(origin uint64, amount int, skip int, reverse bool) ([]*types.Header, error)  {
 	p.Log("Fetching batch of headers", "count", amount, "fromnum", origin, "skip", skip, "reverse", reverse)
 	data := &getBlockHeadersData{Origin: hashOrNumber{Number: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse}
@@ -371,6 +386,23 @@ func (p *peer) GetBodies(hashes []common.Hash) (map[common.Hash]*types.Body, err
 
 	return nil, errEthPeerClosed
 
+}
+
+
+// RequestOneHeader is a wrapper around the header query functions to fetch a
+// single header. It is used solely by the fetcher.
+func (p *peer) GetOneHeader(hash common.Hash) (*types.Header, error) {
+	data := &getBlockHeadersData{Origin: hashOrNumber{Hash: hash}, Amount: uint64(1), Skip: uint64(0), Reverse: false}
+
+	otherPeer := p.nodesEthPeer()
+	if otherPeer != nil {
+		headers := otherPeer.pm.getBlockHeaders(data)
+		if len(headers) > 0 {
+			return headers[0], nil
+		}
+	}
+
+	return nil, errEthPeerClosed
 }
 
 

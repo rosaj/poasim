@@ -120,7 +120,7 @@ func NewProtocolManager(srv IServer,  metricCollector IMetricCollector, eventFee
 
 	}
 
-	manager.downloader = downloader.New(srv.Self().Name(), eventFeed, manager.peers, blockchain, manager.removePeer)
+	manager.downloader = downloader.New(srv.Self().Name(), metricCollector, eventFeed, manager.peers, blockchain, manager.removePeer)
 
 	validator := func(header *types.Header) error {
 		return blockchain.Engine().VerifyHeader(blockchain, header, true)
@@ -428,8 +428,7 @@ func (pm *ProtocolManager) HandleNewBlockMsg(p *peer, m *Message)  {
 	request.Block.ReceivedFrom = p
 
 	pm.log("HandleNewBlockMsg", p, "number:",request.Block.NumberU64())
-	author := pm.blockchain.Engine().AuthorName(request.Block.Header())
-	Log(pm, "Importing", request.Block.Number(), "with td", request.Block.Difficulty(),  "from signer", author)
+
 	// Mark the peer as owning the block and schedule it for import
 	p.MarkBlock(request.Block.Hash())
 	pm.fetcher.Enqueue(p, request.Block)
@@ -471,6 +470,11 @@ func (pm *ProtocolManager) HandleNewBlockHashesMsg(p *peer, m *Message) {
 		if !pm.blockchain.HasBlock(block.Hash, block.Number) {
 			unknown = append(unknown, block)
 		}
+	}
+
+
+	for _, block := range unknown {
+		pm.fetcher.Notify(p, block.Hash, block.Number, p.GetOneHeader, p.GetBodies)
 	}
 }
 
@@ -537,6 +541,7 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 		peer.AsyncSendTransactions(txs)
 	}
 }
+
 
 func (pm *ProtocolManager) broadcastMinedBlock(data interface{}) {
 	if ev, ok := data.(core.NewMinedBlockEvent); ok {

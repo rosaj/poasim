@@ -9,13 +9,13 @@ import (
 
 var SimConfig = config {
 
-	SimulationTime: (1 * 7 * time.Minute).Seconds(),
+	SimulationTime: (1 * 60 * time.Minute).Seconds(),
 
-	NodeCount: 29,
+	NodeCount: 60,
 
-	NodeStabilisationTime:  1 * time.Minute.Seconds(),
+	NodeStabilisationTime:  5 * time.Minute.Seconds(),
 
-	ChurnEnabled: false,
+	ChurnEnabled: true,
 
 	NodeArrivalDistr: NewNormalDistr((13*time.Second.Seconds()), 0),
 
@@ -50,11 +50,17 @@ var MetricConfig  = metricConfig {
 
 	GroupFactor: 15,
 
-	ExportType: CSV,
+	ExportType: PNG,
 
 	CollectType: Average,
 
-	Metrics: metrics.AllMetrics,
+	Metrics: []string {
+		metrics.InsertForkedBlock,
+		metrics.ChainSplitDepth,
+		metrics.SyncDiff,
+	},
+
+//	Metrics: metrics.AllMetrics,
 //	Metrics: []string{
 //		metrics.MinedBlock,
 //		metrics.TxsPerBlock,
@@ -81,8 +87,8 @@ var EthConfig = EthereumConfig {
 
 
 var ChainConfig = &chainConfig {
-	Engine:	CLIQUE,
-	Clique: & CliqueConfig {
+	Engine:	AURA,
+	Clique: &CliqueConfig {
 		Period: 15,
 		Epoch:	30000,
 	},
@@ -150,7 +156,7 @@ var LogConfig = logConfig {
 
 	LogEthServer: false,
 
-	LogWorker: true,
+	LogWorker: false,
 
 	LogConsensus: false,
 
@@ -160,7 +166,7 @@ var LogConfig = logConfig {
 
 	LogTxPool: false,
 
-	LogDownload: true,
+	LogDownload: false,
 
 	LogDatabase: false,
 }

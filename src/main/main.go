@@ -8,10 +8,12 @@ import (
 	"../export"
 	"../generate"
 	"../network"
+	"../network/eth"
 	"../network/eth/core"
 	"../network/protocol"
 	. "../scenario"
 	"../util"
+	"fmt"
 	"github.com/agoussia/godes"
 	"math"
 	"runtime"
@@ -123,13 +125,35 @@ func RunSim() int {
 
 	godes.Advance(config.SimConfig.NodeStabilisationTime)
 
+	startMinting(nodes)
 
 	if config.SimConfig.SimMode == config.BLOCKCHAIN {
 		generate.AsyncTxsDistr(nodes[:config.SimConfig.NodeCount])
 	}
 
-	/*
-	godes.Advance(60*5)
+	//godes.Advance(config.SimConfig.SimulationTime - godes.GetSystemTime() - 10)
+	//printDEVp2pConnections(nodes)
+//	ScenarioNodeLeavingNetwork(nodes[:len(nodes) - bootNodeCount],  config.SimConfig.NodeCount/2, sysTime.Hour)
+
+	waitForEnd(nodes)
+
+	return c
+}
+
+func startMinting(nodes []*network.Node)  {
+
+	for _, node := range nodes {
+		if srv := node.Server(); srv != nil {
+			e := srv.(*eth.Ethereum)
+			ebase, _ := e.Etherbase()
+			e.Miner().Start(ebase)
+		}
+	}
+
+}
+
+func printDEVp2pConnections(nodes []*network.Node)  {
+
 	for _, node := range nodes {
 		util.Print(node.Name())
 		if node.Server() == nil {
@@ -140,14 +164,7 @@ func RunSim() int {
 		}
 		fmt.Println("")
 	}
-	*/
-//	ScenarioNodeLeavingNetwork(nodes[:len(nodes) - bootNodeCount],  config.SimConfig.NodeCount/2, sysTime.Hour)
-
-	waitForEnd(nodes)
-
-	return c
 }
-
 
 func progressSimToEnd()  {
 	dif := config.SimConfig.SimulationTime - godes.GetSystemTime()

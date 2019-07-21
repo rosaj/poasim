@@ -621,7 +621,9 @@ func (c *Clique) Seal(chain consensus.ChainReader, block *types.Block, results f
 	if header.Difficulty.Cmp(diffNoTurn) == 0 {
 		// It's not our turn explicitly to sign, delay it a bit
 		wiggle := time.Duration(len(snap.Signers)/2+1) * wiggleTime
-		delay += time.Duration(rand.Int63n(int64(wiggle)))
+		randDelay := time.Duration(rand.Int63n(int64(wiggle)))
+		//Log(c.name, "rand delay", randDelay)
+		delay += randDelay
 
 		c.log("Out-of-turn signing requested", "wiggle", wiggle)
 	}

@@ -3,6 +3,7 @@ package downloader
 import (
 	. "../../../common"
 	. "../../../config"
+	"../../../metrics"
 	"../../../network/message"
 	. "../../../util"
 	"../common"
@@ -76,6 +77,12 @@ var (
 	errTooOld                  = errors.New("peer doesn't speak recent enough protocol version (need version >= 62)")
 )
 
+var	(
+
+	SyncDiff				   = metrics.SyncDiff
+
+)
+
 type peerSet interface {
 	Peer(id ID) IPeer
 }
@@ -83,6 +90,8 @@ type peerSet interface {
 
 // LightPeer encapsulates the methods required to synchronise with a remote light peer.
 type Peer interface {
+	GetBlock(number uint64) *types.Block
+	GetHeight() uint64
 	Head() (common.Hash, *big.Int)
 	GetHeadersByHash(common.Hash, int, int, bool) ([]*types.Header, error)
 	GetHeadersByNumber(uint64, int, int, bool) ([]*types.Header, error)
@@ -91,6 +100,8 @@ type Peer interface {
 
 
 type Downloader struct {
+	IMetricCollector
+
 	name string
 	mux  *EventFeed // Event multiplexer to announce sync operation events
 
@@ -158,13 +169,14 @@ type BlockChain interface {
 
 
 // New creates a new downloader to fetch hashes and blocks from remote peers.
-func New(name string, mux *EventFeed, peerSet peerSet, chain BlockChain, dropPeer func(ID)) *Downloader {
+func New(name string, metricsCollector IMetricCollector, mux *EventFeed, peerSet peerSet, chain BlockChain, dropPeer func(ID)) *Downloader {
 	dl := &Downloader{
-		name: 			name,
-		mux:            mux,
-		peers:          peerSet,
-		blockchain:     chain,
-		dropPeer:       dropPeer,
+		IMetricCollector: metricsCollector,
+		name: 			  name,
+		mux:              mux,
+		peers:            peerSet,
+		blockchain:       chain,
+		dropPeer:         dropPeer,
 	}
 	return dl
 }
@@ -252,18 +264,27 @@ func (d *Downloader) syncWithPeer(p Peer, hash common.Hash, td *big.Int) (err er
 
 	d.log("Mine height", localHeight, "peer height", height)
 
-/*	if localHeight >= height {
-		return nil
+	origin, err := d.findAncestor(p, height, localHeight)
+	if err != nil {
+		return err
+	}
+	realHeight := p.GetHeight()
+
+	if diff := localHeight - origin; diff > 0 {
+		same := d.blockchain.CurrentBlock().Hash() == p.GetBlock(localHeight).Hash()
+		realOrigin, _ := d.findAncestor(p, realHeight, localHeight)
+		Log(d.name	, "local", localHeight, "remote", height, "origin", origin, "remote peer", p, "with real height", realHeight, "real origin", realOrigin, "same", same, "diff", diff)
+		d.Set(SyncDiff, int(diff))
 	}
 
- */
+	localHeight = origin
+
 	d.log("Synchronising with the network", "peer", p)
 
 	hashes := make([]common.Hash, 0)
 	headerHashes := make(map[common.Hash]*types.Header,0)
 
-//	for i := localHeight+1; i <= height ; i+=1 {
-	for i := localHeight; i <= height ; i+=1 {
+	for i := localHeight+1; i <= height ; i+=1 {
 		godes.Advance(SimConfig.NextNetworkLatency())
 
 		headers, err := p.GetHeadersByNumber(i, MaxHeaderFetch, 0, false)
@@ -271,7 +292,7 @@ func (d *Downloader) syncWithPeer(p Peer, hash common.Hash, td *big.Int) (err er
 			return err
 		}
 
-		godes.Advance(message.CalculateSizeLatency(calcHeadersSize(headers)))
+		godes.Advance(message.CalculateSizeLatency(CalcHeadersSize(headers)))
 
 		d.log("Inserting headers", len(headers))
 
@@ -291,7 +312,7 @@ func (d *Downloader) syncWithPeer(p Peer, hash common.Hash, td *big.Int) (err er
 		return err
 	}
 
-	godes.Advance(message.CalculateSizeLatency(calcBodysSize(results)))
+	godes.Advance(message.CalculateSizeLatency(CalcBodysSize(results)))
 
 	blocks := make([]*types.Block, len(results))
 
@@ -322,7 +343,7 @@ func (d *Downloader) syncWithPeer(p Peer, hash common.Hash, td *big.Int) (err er
 	return nil
 }
 
-func calcHeadersSize(headers []*types.Header) common.StorageSize {
+func CalcHeadersSize(headers []*types.Header) common.StorageSize {
 	size := common.StorageSize(0)
 	for _, header := range headers {
 		size += header.Size()
@@ -331,7 +352,7 @@ func calcHeadersSize(headers []*types.Header) common.StorageSize {
 	return size
 }
 
-func calcBodysSize(bodys map[common.Hash]*types.Body) common.StorageSize  {
+func CalcBodysSize(bodys map[common.Hash]*types.Body) common.StorageSize  {
 	size := common.StorageSize(0)
 
 	for _, body := range bodys {
@@ -358,6 +379,132 @@ func (d *Downloader) fetchHeight(p Peer) (*types.Header, error){
 	return headers[0], nil
 
 }
+
+// findAncestor tries to locate the common ancestor link of the local chain and
+// a remote peers blockchain. In the general case when our node was in sync and
+// on the correct chain, checking the top N links should already get us a match.
+// In the rare scenario when we ended up on a long reorganisation (i.e. none of
+// the head links match), we do a binary search to find the common ancestor.
+func (d *Downloader) findAncestor(p Peer, remoteHeaderHeight uint64, localHeight uint64)(uint64, error) {
+
+	from, count, skip, max := calculateRequestSpan(remoteHeaderHeight, localHeight)
+
+	godes.Advance(SimConfig.NextNetworkLatency())
+
+	headers, err := p.GetHeadersByNumber(uint64(from), count, skip, false)
+
+	if err != nil {
+		return 0, err
+	}
+
+	godes.Advance(message.CalculateSizeLatency(CalcHeadersSize(headers)))
+
+	floor := int64(-1)
+	maxForkAncestry := uint64(90000)
+	// Recap floor value for binary search
+	if localHeight >= maxForkAncestry {
+		// We're above the max reorg threshold, find the earliest fork point
+		floor = int64(localHeight - maxForkAncestry)
+	}
+
+	// Wait for the remote response to the head fetch
+	number, hash := uint64(0), common.Hash{}
+
+
+	if len(headers) == 0 {
+		return 0, errEmptyHeaderSet
+	}
+	// Make sure the peer's reply conforms to the request
+	for i, header := range headers {
+		expectNumber := from + int64(i)*int64(skip+1)
+		if number := header.Number.Int64(); number != expectNumber {
+			return 0, errInvalidChain
+		}
+	}
+	// Check if a common ancestor was found
+	for i := len(headers) - 1; i >= 0; i-- {
+		// Skip any headers that underflow/overflow our requested set
+		if headers[i].Number.Int64() < from || headers[i].Number.Uint64() > max {
+			continue
+		}
+		// Otherwise check if we already know the header or not
+		h := headers[i].Hash()
+		n := headers[i].Number.Uint64()
+
+		known := d.blockchain.HasBlock(h, n)
+		if known {
+			number, hash = n, h
+			break
+		}
+	}
+
+	// If the head fetch already found an ancestor, return
+	if hash != (common.Hash{}) {
+		if int64(number) <= floor {
+			d.log("Ancestor below allowance", "number", number, "hash", hash, "allowance", floor)
+			return 0, errInvalidAncestor
+		}
+		d.log("Found common ancestor", "number", number, "hash", hash)
+		return number, nil
+	}
+
+	return 0, nil
+
+}
+
+
+// calculateRequestSpan calculates what headers to request from a peer when trying to determine the
+// common ancestor.
+// It returns parameters to be used for peer.RequestHeadersByNumber:
+//  from - starting block number
+//  count - number of headers to request
+//  skip - number of headers to skip
+// and also returns 'max', the last block which is expected to be returned by the remote peers,
+// given the (from,count,skip)
+func calculateRequestSpan(remoteHeight, localHeight uint64) (int64, int, int, uint64) {
+	var (
+		from     int
+		count    int
+		MaxCount = MaxHeaderFetch / 16
+	)
+	// requestHead is the highest block that we will ask for. If requestHead is not offset,
+	// the highest block that we will get is 16 blocks back from head, which means we
+	// will fetch 14 or 15 blocks unnecessarily in the case the height difference
+	// between us and the peer is 1-2 blocks, which is most common
+	requestHead := int(remoteHeight) - 1
+	if requestHead < 0 {
+		requestHead = 0
+	}
+	// requestBottom is the lowest block we want included in the query
+	// Ideally, we want to include just below own head
+	requestBottom := int(localHeight - 1)
+	if requestBottom < 0 {
+		requestBottom = 0
+	}
+	totalSpan := requestHead - requestBottom
+	span := 1 + totalSpan/MaxCount
+	if span < 2 {
+		span = 2
+	}
+	if span > 16 {
+		span = 16
+	}
+
+	count = 1 + totalSpan/span
+	if count > MaxCount {
+		count = MaxCount
+	}
+	if count < 2 {
+		count = 2
+	}
+	from = requestHead - (count-1)*span
+	if from < 0 {
+		from = 0
+	}
+	max := from + (count-1)*span
+	return int64(from), count, span - 1, uint64(max)
+}
+
 
 
 

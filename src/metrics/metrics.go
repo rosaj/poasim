@@ -13,6 +13,7 @@ const (
 	ChainSplitDepth				= "chain split depth"
 	GasLimit					= "gas limit"
 	TxsPerBlock					= "txs per block"
+	SyncDiff					= "sync dif"
 )
 
 
