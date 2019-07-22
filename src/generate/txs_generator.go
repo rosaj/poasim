@@ -102,6 +102,7 @@ func randomBroadcast(broadcastNodes []*network.Node, txs types.Transactions) int
 	}
 
 	txStats.Update(metrics.TxsArrival)
+	FinalityMetricCollector.TxSubmitted(txs[0].Hash().String())
 
 	errors := broadcastNodes[index].Server().GetProtocolManager().AddTxs(txs)
 	//util.Log("sending to ", broadcastNodes[index].Name())

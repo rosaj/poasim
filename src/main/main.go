@@ -152,6 +152,16 @@ func startMinting(nodes []*network.Node)  {
 
 }
 
+func printFinality()  {
+	for _, tx := range FinalityMetricCollector.Collect() {
+		util.Print("Submited", tx.Submitted)
+		util.Print("Included", tx.Included)
+		util.Print("Inserted", tx.Inserted)
+		util.Print("Forked", tx.Forked)
+		util.Print("")
+	}
+}
+
 func printDEVp2pConnections(nodes []*network.Node)  {
 
 	for _, node := range nodes {
@@ -213,6 +223,7 @@ func showStats(nodes []*network.Node)  {
 	if config.SimConfig.SimMode == config.BLOCKCHAIN {
 		PrintBlockchainStats(nodes, false)
 	}
+	printFinality()
 }
 
 

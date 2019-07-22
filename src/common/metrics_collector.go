@@ -2,6 +2,7 @@ package common
 
 import (
 	. "../config"
+	"github.com/agoussia/godes"
 )
 
 /*
@@ -31,6 +32,8 @@ func statFn(name string)  CalcFn {
 }
 
 */
+
+
 
 var GlobalMetricCollector = NewMetricCollector()
 
@@ -106,6 +109,60 @@ func (mc *MetricCollector) Get(name string) map[float64]int {
 	}
 	return stats
 }
+
+
+
+var FinalityMetricCollector = newTxMetricCollector()
+
+
+type txEntry struct {
+	Submitted 	float64
+	Included	[]float64
+	Inserted	[]float64
+	Forked		[]float64
+}
+
+
+type TxMetricCollector struct {
+	metrics	map[string]*txEntry
+}
+
+func newTxMetricCollector() *TxMetricCollector {
+	return &TxMetricCollector{
+		metrics: make(map[string]*txEntry, 0),
+	}
+}
+
+
+func (mc *TxMetricCollector) TxSubmitted(name string)  {
+
+	tx := &txEntry{ Submitted: godes.GetSystemTime(), 
+					Included:  make([]float64, 0),
+				    Inserted:  make([]float64, 0),
+				    Forked:    make([]float64, 0),}
+	
+
+	mc.metrics[name] = tx
+}
+
+
+func (mc *TxMetricCollector) TxIncluded(name string)  {
+	mc.metrics[name].Included = append(mc.metrics[name].Included, godes.GetSystemTime())
+}
+
+func (mc *TxMetricCollector) TxInserted(name string)  {
+	mc.metrics[name].Inserted = append(mc.metrics[name].Inserted, godes.GetSystemTime())
+}
+
+func (mc *TxMetricCollector) TxForked(name string)  {
+	mc.metrics[name].Forked = append(mc.metrics[name].Forked, godes.GetSystemTime())
+}
+
+func (mc *TxMetricCollector) Collect() map[string]*txEntry {
+	return mc.metrics
+}
+
+
 
 /*
 type MetricCollector struct {

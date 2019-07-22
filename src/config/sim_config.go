@@ -9,7 +9,7 @@ import (
 
 var SimConfig = config {
 
-	SimulationTime: (1 * 60 * time.Minute).Seconds(),
+	SimulationTime: (1 * 15 * time.Minute).Seconds(),
 
 	NodeCount: 6,
 
@@ -42,7 +42,7 @@ var SimConfig = config {
 
 		TxPriceDistr: NewNormalDistr(3, 1),
 
-		Duration: 0 * time.Minute,
+		Duration: 5 * time.Minute,
 
 	},
 }

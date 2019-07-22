@@ -1243,6 +1243,10 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 
 			bc.Set(GasLimit, int(block.GasLimit()))
 
+			for _, tx := range block.Transactions() {
+				FinalityMetricCollector.TxInserted(tx.Hash().String())
+			}
+
 			coalescedLogs = append(coalescedLogs, logs...)
 			events = append(events, ChainEvent{block, block.Hash()})
 			lastCanon = block
@@ -1257,6 +1261,10 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 				"root", block.Root())
 
 			bc.Update(InsertForkedBlock)
+
+			for _, tx := range block.Transactions() {
+				FinalityMetricCollector.TxForked(tx.Hash().String())
+			}
 
 			events = append(events, ChainSideEvent{block})
 		}

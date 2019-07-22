@@ -545,6 +545,14 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 
 func (pm *ProtocolManager) broadcastMinedBlock(data interface{}) {
 	if ev, ok := data.(core.NewMinedBlockEvent); ok {
+/*
+		for _, tx := range ev.Block.Transactions() {
+			FinalityMetricCollector.Set(tx.Hash().String(), godes.GetSystemTime())
+		}
+*/
+		for _, tx := range ev.Block.Transactions() {
+			FinalityMetricCollector.TxIncluded(tx.Hash().String())
+		}
 
 		pm.Update(MinedBlock)
 		pm.Set(TxsPerBlock, ev.Block.Transactions().Len())
