@@ -268,12 +268,14 @@ func (d *Downloader) syncWithPeer(p Peer, hash common.Hash, td *big.Int) (err er
 	if err != nil {
 		return err
 	}
-	realHeight := p.GetHeight()
 
-	if diff := localHeight - origin; diff > 0 {
+	if diff := height - origin; diff > 0 {
+		realHeight := p.GetHeight()
+
 		same := d.blockchain.CurrentBlock().Hash() == p.GetBlock(localHeight).Hash()
 		realOrigin, _ := d.findAncestor(p, realHeight, localHeight)
-		Log(d.name	, "local", localHeight, "remote", height, "origin", origin, "remote peer", p, "with real height", realHeight, "real origin", realOrigin, "same", same, "diff", diff)
+
+		d.log(d.name	, "local", localHeight, "remote", height, "origin", origin, "remote peer", p, "with real height", realHeight, "real origin", realOrigin, "same", same, "diff", diff)
 		d.Set(SyncDiff, int(diff))
 	}
 

@@ -15,7 +15,7 @@ var SimConfig = config {
 
 	NodeStabilisationTime:  5 * time.Minute.Seconds(),
 
-	ChurnEnabled: true,
+	ChurnEnabled: false,
 
 	NodeArrivalDistr: NewNormalDistr((13*time.Second.Seconds()), 0),
 
@@ -87,7 +87,7 @@ var EthConfig = EthereumConfig {
 
 
 var ChainConfig = &chainConfig {
-	Engine:	AURA,
+	Engine:	CLIQUE,
 	Clique: &CliqueConfig {
 		Period: 15,
 		Epoch:	30000,
