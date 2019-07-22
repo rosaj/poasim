@@ -221,4 +221,4 @@ func main()  {
 }
 
 
-//go build -o poasim.so -buildmode=c-shared src/main/main.go
+//go build -buildmode=c-shared -o poasim.so  src/main/main.go

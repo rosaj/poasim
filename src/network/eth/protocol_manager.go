@@ -545,8 +545,10 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 
 func (pm *ProtocolManager) broadcastMinedBlock(data interface{}) {
 	if ev, ok := data.(core.NewMinedBlockEvent); ok {
+
 		pm.Update(MinedBlock)
 		pm.Set(TxsPerBlock, ev.Block.Transactions().Len())
+
 		pm.BroadcastBlock(ev.Block, true)  // First propagate block to peers
 		pm.BroadcastBlock(ev.Block, false) // Only then announce to the rest
 	}

@@ -11,7 +11,7 @@ var SimConfig = config {
 
 	SimulationTime: (1 * 60 * time.Minute).Seconds(),
 
-	NodeCount: 60,
+	NodeCount: 6,
 
 	NodeStabilisationTime:  5 * time.Minute.Seconds(),
 
@@ -28,6 +28,8 @@ var SimConfig = config {
 	NetworkLatency:  NewLogNormalDistr(.209,.157),// u metodi NextNetworkLatency dodano /10
 
 	MaxPeers: 25,
+
+	DialRatio: 0,
 
 	SimMode: BLOCKCHAIN,
 
