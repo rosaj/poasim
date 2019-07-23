@@ -122,14 +122,30 @@ type txEntry struct {
 	Forked		[]float64
 }
 
+func (tx *txEntry) CalcFinality() (float64, float64) {
+	last := 0.0
+
+	if insLen := len(tx.Inserted); insLen > 0 {
+		last = tx.Inserted[insLen - 1]
+	}
+
+	if forkLen := len(tx.Forked); forkLen > 0  && tx.Forked[forkLen - 1] > last{
+		last = tx.Forked[forkLen - 1]
+	}
+
+
+	return last - tx.Submitted, last - tx.Included[0]
+}
 
 type TxMetricCollector struct {
 	metrics	map[string]*txEntry
+	sync 	bool
 }
 
 func newTxMetricCollector() *TxMetricCollector {
 	return &TxMetricCollector{
 		metrics: make(map[string]*txEntry, 0),
+		sync: 	 false,
 	}
 }
 
@@ -151,6 +167,9 @@ func (mc *TxMetricCollector) TxIncluded(name string)  {
 }
 
 func (mc *TxMetricCollector) TxInserted(name string)  {
+	if mc.sync {
+		return
+	}
 	mc.metrics[name].Inserted = append(mc.metrics[name].Inserted, godes.GetSystemTime())
 }
 
@@ -162,7 +181,13 @@ func (mc *TxMetricCollector) Collect() map[string]*txEntry {
 	return mc.metrics
 }
 
+func (mc *TxMetricCollector) SyncingBlocksStart()  {
+	mc.sync = true
+}
 
+func (mc *TxMetricCollector) SyncingBlocksEnd()  {
+	mc.sync = false
+}
 
 /*
 type MetricCollector struct {

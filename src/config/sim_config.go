@@ -7,15 +7,15 @@ import (
 	"time"
 )
 
-var SimConfig = config {
+var SimConfig = config{
 
-	SimulationTime: (1 * 15 * time.Minute).Seconds(),
+	SimulationTime: (1 * 20 * time.Minute).Seconds(),
 
-	NodeCount: 6,
+	NodeCount: 60,
 
 	NodeStabilisationTime:  5 * time.Minute.Seconds(),
 
-	ChurnEnabled: false,
+	ChurnEnabled: true,
 
 	NodeArrivalDistr: NewNormalDistr((13*time.Second.Seconds()), 0),
 
@@ -42,7 +42,7 @@ var SimConfig = config {
 
 		TxPriceDistr: NewNormalDistr(3, 1),
 
-		Duration: 5 * time.Minute,
+		Duration: 10 * time.Minute,
 
 	},
 }

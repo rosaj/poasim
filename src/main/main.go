@@ -114,7 +114,7 @@ func logProgress(a ...interface{})  {
 }
 
 //export RunSim
-func RunSim() int {
+func RunSim() (float64, float64) {
 
 	runtime.GOMAXPROCS(1)
 
@@ -137,7 +137,7 @@ func RunSim() int {
 
 	waitForEnd(nodes)
 
-	return c
+	return calcFinality()
 }
 
 func startMinting(nodes []*network.Node)  {
@@ -152,15 +152,56 @@ func startMinting(nodes []*network.Node)  {
 
 }
 
-func printFinality()  {
+func calcFinality() (float64, float64)  {
+//	t := make(map[int]int)
+	w, f := 0.0, 0.0
 	for _, tx := range FinalityMetricCollector.Collect() {
+		waitTime, finality := tx.CalcFinality()
+		w+=waitTime
+		f+=finality
+		//	t[len(tx.Inserted)]+=1
+		if len(tx.Forked) == 0 || len(tx.Inserted) == config.SimConfig.NodeCount {
+			continue
+		}/*
 		util.Print("Submited", tx.Submitted)
 		util.Print("Included", tx.Included)
 		util.Print("Inserted", tx.Inserted)
 		util.Print("Forked", tx.Forked)
-		util.Print("")
+		util.Print("")*/
 	}
+
+	count := len(FinalityMetricCollector.Collect())
+
+	util.Print(w/float64(count), f/float64(count))
+
+	return w/float64(count), f/float64(count)
+	/*
+		for k, v := range t {
+			util.Print(k, v)
+		}*/
 }
+
+// N = 6
+
+// AURA
+// [10.051947452134614 0.40547179307658965]
+// [13.949590988502898 0.4003330614381889]
+// [10.129061363800826 0.40334000143182525]
+
+// CLIQUE
+// [10.049930785103806 0.8499236772946238]
+// [10.072293669547486 0.7186380174758570]
+// [9.944465135962895  0.8539474318580816]
+
+
+// N = 60
+
+// AURA
+//
+
+
+// CLIQUE
+//
 
 func printDEVp2pConnections(nodes []*network.Node)  {
 
@@ -223,12 +264,11 @@ func showStats(nodes []*network.Node)  {
 	if config.SimConfig.SimMode == config.BLOCKCHAIN {
 		PrintBlockchainStats(nodes, false)
 	}
-	printFinality()
 }
 
 
 func main()  {
-	RunSim()
+	//RunSim()
 }
 
 

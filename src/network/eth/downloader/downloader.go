@@ -328,6 +328,9 @@ func (d *Downloader) syncWithPeer(p Peer, hash common.Hash, td *big.Int) (err er
 	//	d.log("Created block", blocks[i].NumberU64())
 	}
 
+	FinalityMetricCollector.SyncingBlocksStart()
+	defer FinalityMetricCollector.SyncingBlocksEnd()
+
 	if index, err := d.blockchain.InsertChain(blocks); err != nil {
 		if index < len(results) {
 			d.log("Downloaded item processing failed", "number", blocks[index].Header().Number, "err", err)
