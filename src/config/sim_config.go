@@ -13,11 +13,11 @@ var SimConfig = config{
 
 	NodeCount: 60,
 
-	NodeStabilisationTime:  5 * time.Minute.Seconds(),
+	NodeStabilisationTime:  1 * time.Minute.Seconds(),
 
 	ChurnEnabled: true,
 
-	NodeArrivalDistr: NewNormalDistr((13*time.Second.Seconds()), 0),
+	NodeArrivalDistr: NewNormalDistr((1.3*time.Second.Seconds()), 0),
 
 	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Hour).Seconds())),
 
@@ -142,7 +142,7 @@ var	defaultMinerConfig = &minerConfig {
 
 var LogConfig = logConfig {
 
-	Logging: true,
+	Logging: false,
 
 	LogMessages: false,
 

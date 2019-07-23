@@ -268,7 +268,7 @@ func showStats(nodes []*network.Node)  {
 
 
 func main()  {
-	//RunSim()
+	RunSim()
 }
 
 
