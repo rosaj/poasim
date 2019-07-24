@@ -114,7 +114,17 @@ func logProgress(a ...interface{})  {
 }
 
 //export RunSim
-func RunSim() (float64, float64) {
+func RunSim(nodeCount int, blockTime int) (float64, float64) {
+
+	config.SimConfig.NodeCount = nodeCount
+	config.ChainConfig.Clique.Period = uint64(blockTime)
+	config.ChainConfig.Aura.Period = uint64(blockTime)
+
+	return StartSim()
+}
+
+
+func StartSim() (float64, float64) {
 
 	runtime.GOMAXPROCS(1)
 
@@ -267,8 +277,9 @@ func showStats(nodes []*network.Node)  {
 }
 
 
-func main()  {
-	RunSim()
+func main() {
+	//StartSim()
+	//RunSim(5, 15)
 }
 
 

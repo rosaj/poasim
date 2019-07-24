@@ -42,7 +42,7 @@ var SimConfig = config{
 
 		TxPriceDistr: NewNormalDistr(3, 1),
 
-		Duration: 10 * time.Minute,
+		Duration: 1 * time.Minute,
 
 	},
 }
