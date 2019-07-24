@@ -116,12 +116,20 @@ func logProgress(a ...interface{})  {
 //export RunSim
 func RunSim(nodeCount int, blockTime int) (float64, float64) {
 
+	FinalityMetricCollector.Reset()
+	generate.Reset()
+	network.Reset()
+
 	config.SimConfig.NodeCount = nodeCount
 	config.ChainConfig.Clique.Period = uint64(blockTime)
 	config.ChainConfig.Aura.Period = uint64(blockTime)
 
+	config.MetricConfig.ExportType = config.NA
+
+
 	return StartSim()
 }
+
 
 
 func StartSim() (float64, float64) {

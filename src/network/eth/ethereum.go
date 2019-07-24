@@ -315,7 +315,7 @@ func (s *Ethereum) StartMining() error {
 
 		s.miner.SetEtherbase(eb)
 
-
+/*
 		if minersStarted > 0 {
 			return nil
 		}
@@ -325,14 +325,14 @@ func (s *Ethereum) StartMining() error {
 //			s.miner.Start(eb)
 			s.log("Starting to mine")
 		})
-
+*/
 
 	}
 
 	return nil
 }
 
-var minersStarted = 0
+// var minersStarted = 0
 
 func (s *Ethereum) SetOnline(online bool)  {
 	//Print(s.Self().Name(), "ETHEREUM ONLINE", online)

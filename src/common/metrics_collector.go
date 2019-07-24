@@ -133,6 +133,9 @@ func (tx *txEntry) CalcFinality() (float64, float64) {
 		last = tx.Forked[forkLen - 1]
 	}
 
+	if len(tx.Included) == 0 {
+		return 99999999999, 99999999999
+	}
 
 	return last - tx.Submitted, last - tx.Included[0]
 }
@@ -186,6 +189,11 @@ func (mc *TxMetricCollector) SyncingBlocksStart()  {
 }
 
 func (mc *TxMetricCollector) SyncingBlocksEnd()  {
+	mc.sync = false
+}
+
+func (mc *TxMetricCollector) Reset()  {
+	mc.metrics = make(map[string]*txEntry, 0)
 	mc.sync = false
 }
 

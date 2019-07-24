@@ -23,6 +23,13 @@ func GetTxsStats() map[float64]float64 {
 
 var	nonceCounter = make(map[common.Address]uint64)
 
+func Reset()  {
+	nonceCounter = make(map[common.Address]uint64)
+	GlobalMetricCollector = NewMetricCollector()
+	txStats = GlobalMetricCollector
+}
+
+
 func txs(broadcastNodes []*network.Node,  actorCount int, stepFunc func(count int) (bool, float64))  {
 
 	actors := core.Actors

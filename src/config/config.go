@@ -102,6 +102,7 @@ type ExportType string
 var (
 	PNG = ExportType("png")
 	CSV = ExportType("csv")
+	NA  = ExportType("none")
 )
 
 type DataCollectType int

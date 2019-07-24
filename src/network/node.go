@@ -88,6 +88,10 @@ type Msg struct {
 	Size float64
 }
 
+func Reset()  {
+	nodeCounter = 1
+	nodeStats = GlobalMetricCollector
+}
 var nodeCounter = 1
 
 func NewBootstrapNode(nodeConfig *NodeConfig) (n *Node) {
