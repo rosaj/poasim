@@ -147,6 +147,8 @@ func StartSim() (float64, float64) {
 
 	startMinting(nodes)
 
+	godes.Advance(config.SimConfig.NodeStabilisationTime)
+
 	if config.SimConfig.SimMode == config.BLOCKCHAIN {
 		generate.AsyncTxsDistr(nodes[:config.SimConfig.NodeCount])
 	}
@@ -290,8 +292,8 @@ func showStats(nodes []*network.Node)  {
 
 
 func main() {
-	RunSim(71, 20, 19, 1)
-	//StartSim()
+	//RunSim(71, 20, 19, 1)
+	StartSim()
 	//RunSim(5, 15)
 }
 
