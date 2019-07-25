@@ -110,7 +110,7 @@ func runNodes() []*network.Node {
 }
 
 func logProgress(a ...interface{})  {
-	util.Log(math.Round((godes.GetSystemTime()/config.SimConfig.SimulationTime)*100), "% elapsed:", sysTime.Since(startTime), a)
+	util.Print(math.Round((godes.GetSystemTime()/config.SimConfig.SimulationTime)*100), "% elapsed:", sysTime.Since(startTime), a)
 }
 
 //export RunSim
@@ -238,13 +238,13 @@ func printDEVp2pConnections(nodes []*network.Node)  {
 }
 
 func progressSimToEnd()  {
-	loggingProgress := false
+	//loggingProgress := true
 
 	dif := config.SimConfig.SimulationTime - godes.GetSystemTime()
 
 	if dif > 0 {
 
-		if config.LogConfig.Logging || !loggingProgress {
+		if config.LogConfig.Logging /*|| !loggingProgress*/ {
 			godes.Advance(dif)
 		} else {
 
@@ -290,7 +290,8 @@ func showStats(nodes []*network.Node)  {
 
 
 func main() {
-	StartSim()
+	RunSim(71, 20, 19, 1)
+	//StartSim()
 	//RunSim(5, 15)
 }
 
