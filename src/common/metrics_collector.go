@@ -33,6 +33,35 @@ func statFn(name string)  CalcFn {
 
 */
 
+func newDummyCollector() *DummyCollector {
+	return &DummyCollector{}
+}
+type DummyCollector struct {
+
+}
+
+
+func (dc *DummyCollector) UpdateWithValue(name string, value int) {
+}
+
+func (dc *DummyCollector) Update(name string)  {
+}
+
+func (dc *DummyCollector) Set(name string, value int)  {
+}
+
+func (dc *DummyCollector) Collect(name string) map[float64]float64 {
+	stats := make(map[float64]float64, 0)
+	return stats
+}
+
+
+func (dc *DummyCollector) Get(name string) map[float64]int {
+	stats := make(map[float64]int, 0)
+	return stats
+}
+
+
 
 
 var GlobalMetricCollector = NewMetricCollector()
@@ -42,8 +71,9 @@ type MetricCollector struct {
 	metrics	map[string]map[float64]*entry
 }
 
-func NewMetricCollector() *MetricCollector {
-	return newMetricCollector()
+func NewMetricCollector() IMetricCollector {
+	//return newMetricCollector()
+	return newDummyCollector()
 }
 
 type entry struct {

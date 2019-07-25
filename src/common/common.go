@@ -114,4 +114,5 @@ type IMetricCollector interface {
 	Set(name string, value int)
 	Update(name string)
 	UpdateWithValue(name string, value int)
+	Collect(name string) map[float64]float64
 }
