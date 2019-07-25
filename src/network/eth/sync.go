@@ -151,7 +151,9 @@ func (mg *txSyncManager) syncer() {
 }
 
 func (mg *txSyncManager) stop()  {
-	godes.Interrupt(mg)
+	if mg.IsShedulled() {
+		godes.Interrupt(mg)
+	}
 }
 
 // synchronise tries to sync up our local block chain with a remote peer.

@@ -110,22 +110,24 @@ func runNodes() []*network.Node {
 }
 
 func logProgress(a ...interface{})  {
-	util.Print(math.Round((godes.GetSystemTime()/config.SimConfig.SimulationTime)*100), "% elapsed:", sysTime.Since(startTime), a)
+	util.Log(math.Round((godes.GetSystemTime()/config.SimConfig.SimulationTime)*100), "% elapsed:", sysTime.Since(startTime), a)
 }
 
 //export RunSim
-func RunSim(nodeCount int, blockTime int) (float64, float64) {
+func RunSim(nodeCount int, blockTime int, maxPeers int, consensus int) (float64, float64) {
 
 	FinalityMetricCollector.Reset()
 	generate.Reset()
 	network.Reset()
 
 	config.SimConfig.NodeCount = nodeCount
+	config.SimConfig.MaxPeers = maxPeers
 	config.ChainConfig.Clique.Period = uint64(blockTime)
 	config.ChainConfig.Aura.Period = uint64(blockTime)
 
 	config.MetricConfig.ExportType = config.NA
 
+	config.ChainConfig.Engine = config.ConsensusEngine(consensus)
 
 	return StartSim()
 }
@@ -190,7 +192,7 @@ func calcFinality() (float64, float64)  {
 
 	count := len(FinalityMetricCollector.Collect())
 
-	util.Print(w/float64(count), f/float64(count))
+	//util.Print(w/float64(count), f/float64(count))
 
 	return w/float64(count), f/float64(count)
 	/*
@@ -236,11 +238,13 @@ func printDEVp2pConnections(nodes []*network.Node)  {
 }
 
 func progressSimToEnd()  {
+	loggingProgress := false
+
 	dif := config.SimConfig.SimulationTime - godes.GetSystemTime()
 
 	if dif > 0 {
 
-		if config.LogConfig.Logging {
+		if config.LogConfig.Logging || !loggingProgress {
 			godes.Advance(dif)
 		} else {
 
@@ -265,13 +269,13 @@ func waitForEnd(nodes []*network.Node) {
 		config.SimConfig.SimulationTime = godes.GetSystemTime()
 	}
 
-	config.LogConfig.Logging = true
+	//config.LogConfig.Logging = true
 
 	util.Log("Simulation end after:", sysTime.Since(startTime))
 
 	godes.Clear()
 
-	showStats(nodes)
+	//showStats(nodes)
 	//showStats(nodes[0:len(nodes) - bootNodeCount ])
 
 }
@@ -286,7 +290,7 @@ func showStats(nodes []*network.Node)  {
 
 
 func main() {
-	//StartSim()
+	StartSim()
 	//RunSim(5, 15)
 }
 
