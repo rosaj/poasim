@@ -169,8 +169,9 @@ func startMinting(nodes []*network.Node)  {
 	for _, node := range nodes {
 		if srv := node.Server(); srv != nil {
 			e := srv.(*eth.Ethereum)
-			ebase, _ := e.Etherbase()
-			e.Miner().Start(ebase)
+			e.StartMining()
+			//ebase, _ := e.Etherbase()
+			//e.Miner().Start(ebase)
 		}
 	}
 
@@ -196,7 +197,7 @@ func calcFinality() (float64, float64)  {
 
 	count := len(FinalityMetricCollector.Collect())
 
-	//util.Print(w/float64(count), f/float64(count))
+	util.Print(w/float64(count), f/float64(count))
 
 	return w/float64(count), f/float64(count)
 	/*
@@ -216,6 +217,26 @@ func calcFinality() (float64, float64)  {
 // [10.049930785103806 0.8499236772946238]
 // [10.072293669547486 0.7186380174758570]
 // [9.944465135962895  0.8539474318580816]
+
+
+// N = 6, 30 min tx gen
+
+// Clique
+// [10.644584650405621 0.7702570412267236]
+// [19.049973887238487 1.8954115167774632]
+// [10.450126067277703 0.805763699414532]
+// [11.540757960641251 0.9326180247336314]
+// [10.594739840346156 0.7204162716169101]
+// [16.809031954535886 1.593253034731311]
+
+// Aura
+// [18.88447662096721 0.4036231348647846]
+// [14.1460955698441 0.38272917115313865]
+// [43.276768318785 0.3938832437835324]
+// [15.778308505525727 0.3937070715876581]
+// [14.078821327171982 0.393113799027147]
+
+// [101.65701315758427 0.24307169830126596]
 
 
 // N = 60
@@ -279,7 +300,7 @@ func waitForEnd(nodes []*network.Node) {
 
 	godes.Clear()
 
-	//showStats(nodes)
+	showStats(nodes)
 	//showStats(nodes[0:len(nodes) - bootNodeCount ])
 
 }
@@ -288,14 +309,14 @@ func showStats(nodes []*network.Node)  {
 	export.Stats(nodes)
 
 	if config.SimConfig.SimMode == config.BLOCKCHAIN {
-		PrintBlockchainStats(nodes, false)
+		PrintBlockchainStats(nodes, true)
 	}
 }
 
 
 func main() {
-	RunSim(71, 20, 19, 1)
-	//StartSim()
+	//RunSim(71, 20, 19, 1)
+	StartSim()
 	//RunSim(5, 15)
 }
 

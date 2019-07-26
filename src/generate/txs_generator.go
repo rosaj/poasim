@@ -63,7 +63,7 @@ func txs(broadcastNodes []*network.Node,  actorCount int, stepFunc func(count in
 		next, step = stepFunc(count)
 	}
 
-	util.Log("Generated", count, "txs", "errors", errCount, "final:", count-errCount)
+	util.Print("Generated", count, "txs", "errors", errCount, "final:", count-errCount)
 }
 
 

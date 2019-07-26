@@ -72,8 +72,10 @@ type MetricCollector struct {
 }
 
 func NewMetricCollector() IMetricCollector {
-	//return newMetricCollector()
-	return newDummyCollector()
+	if MetricConfig.ExportType == NA {
+		return newDummyCollector()
+	}
+	return newMetricCollector()
 }
 
 type entry struct {

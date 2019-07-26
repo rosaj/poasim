@@ -11,11 +11,11 @@ var SimConfig = config{
 
 	SimulationTime: (1 * 60 * time.Minute).Seconds(),
 
-	NodeCount: 5,
+	NodeCount: 6,
 
 	NodeStabilisationTime:  1 * time.Minute.Seconds(),
 
-	ChurnEnabled: true,
+	ChurnEnabled: false,
 
 	NodeArrivalDistr: NewNormalDistr((1.3*time.Second.Seconds()), 0),
 
@@ -38,7 +38,10 @@ var SimConfig = config{
 		ActorCount: 1000,
 
 		//TransactionIntervalDistr: NewExpDistr(1/0.06),
-		TransactionIntervalDistr: NewNormalDistr(0.04, 0.01),
+
+		TransactionIntervalDistr: NewNormalDistr(0.441, 0.005), // 38/15 sec
+
+		//TransactionIntervalDistr: NewNormalDistr(0.04, 0.01), // 380/15 sec
 
 		TxPriceDistr: NewNormalDistr(3, 1),
 
@@ -60,6 +63,9 @@ var MetricConfig  = metricConfig {
 		metrics.InsertForkedBlock,
 		metrics.ChainSplitDepth,
 		metrics.SyncDiff,
+		metrics.TxsPerBlock,
+		metrics.TxsArrival,
+		metrics.PendingTxs,
 	},
 
 //	Metrics: metrics.AllMetrics,
@@ -83,13 +89,13 @@ var MetricConfig  = metricConfig {
 
 var EthConfig = EthereumConfig {
 	ChainConfig: ChainConfig,
-	MinerConfig: defaultMinerConfig,
+	MinerConfig: testMinerConfig,
 	TxPoolConfig: defaultTxPoolConfig,
 }
 
 
 var ChainConfig = &chainConfig {
-	Engine:	CLIQUE,
+	Engine:	AURA,
 	Clique: &CliqueConfig {
 		Period: 15,
 		Epoch:	30000,
@@ -126,8 +132,8 @@ var defaultTxPoolConfig = &txPoolConfig {
 
 
 var	testMinerConfig = &minerConfig {
-	GasFloor: 999999999999,
-	GasCeil:  999999999999,
+	GasFloor: 800000,
+	GasCeil:  800000,
 	GasPrice: big.NewInt(params.Wei),
 	Recommit: 3 * time.Second,
 }
@@ -142,13 +148,13 @@ var	defaultMinerConfig = &minerConfig {
 
 var LogConfig = logConfig {
 
-	Logging: false,
+	Logging: true,
 
 	LogMessages: false,
 
 	LogDialing: false,
 
-	LogNode: false,
+	LogNode: true,
 
 	LogPeer: false,
 

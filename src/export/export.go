@@ -1,7 +1,6 @@
 package export
 
 import (
-	"../common"
 	"../config"
 	"fmt"
 	"log"
@@ -84,7 +83,7 @@ func Stats(nodes []*Node)  {
 
 		for _, node := range nodes {
 
-			col := node.IMetricCollector.(*common.MetricCollector)
+			col := node.IMetricCollector//.(*common.MetricCollector)
 			data := col.Collect(stat)
 
 			for key, val := range data {

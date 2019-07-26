@@ -314,7 +314,7 @@ func (s *Ethereum) StartMining() error {
 
 
 		s.miner.SetEtherbase(eb)
-
+		s.miner.Start(eb)
 /*
 		if minersStarted > 0 {
 			return nil
