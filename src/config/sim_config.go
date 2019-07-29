@@ -11,7 +11,7 @@ var SimConfig = config{
 
 	SimulationTime: (1 * 60 * time.Minute).Seconds(),
 
-	NodeCount: 6,
+	NodeCount: 60,
 
 	NodeStabilisationTime:  1 * time.Minute.Seconds(),
 
@@ -19,7 +19,7 @@ var SimConfig = config{
 
 	NodeArrivalDistr: NewNormalDistr((1.3*time.Second.Seconds()), 0),
 
-	NodeSessionTimeDistr: NewExpDistr(1 /( 1 * (time.Hour).Seconds())),
+	NodeSessionTimeDistr: NewExpDistr(1 /( 0.5 * (time.Hour).Seconds())),
 
 	NodeIntersessionTimeDistr: NewExpDistr( 1 / (1 * time.Minute).Seconds()),
 
