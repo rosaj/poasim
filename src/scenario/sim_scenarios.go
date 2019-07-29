@@ -46,19 +46,27 @@ func PrintBlockchainStats(nodes []*network.Node, printAllBlocks bool)  {
 		ob := nodes[i].Server().(*eth.Ethereum).BlockChain().CurrentBlock()
 		util.Print(nodes[i].Name(), ob.NumberU64())
 	}
+
 	size := common.StorageSize(0)
 	total := 0
+
 	for i := max;i >= 1 ; i-=1  {
+
 		block := bc.GetBlockByNumber(uint64(i))
+
 		if block != nil {
+
 			signAddr, err := bc.Engine().Author(block.Header())
 			if err != nil {
 				util.LogError(err)
 			}
+
 			signer := findNodeByAddress(nodes, signAddr)
+
 			if printAllBlocks {
-				util.Print(block.Number(), "tx count", block.Transactions().Len(), "signer", signer)
+				util.Print(block.Number(), "tx count", block.Transactions().Len(), "signer", signer, "gasLimit", block.GasLimit(), "gasUsed", block.GasUsed())
 			}
+
 			size += block.Size()
 			size += block.Header().Size()
 

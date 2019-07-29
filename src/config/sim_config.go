@@ -15,7 +15,7 @@ var SimConfig = config{
 
 	NodeStabilisationTime:  1 * time.Minute.Seconds(),
 
-	ChurnEnabled: false,
+	ChurnEnabled: true,
 
 	NodeArrivalDistr: NewNormalDistr((1.3*time.Second.Seconds()), 0),
 
@@ -35,11 +35,13 @@ var SimConfig = config{
 
 	TxGeneratorConfig: txGeneratorConfig {
 
-		ActorCount: 1000,
+		ActorCount: 10000,
 
 		//TransactionIntervalDistr: NewExpDistr(1/0.06),
 
-		TransactionIntervalDistr: NewNormalDistr(0.441, 0.005), // 38/15 sec
+		TransactionIntervalDistr: NewNormalDistr(calcTxArrival(), calcTxArrival()/5.0),
+
+		//TransactionIntervalDistr: NewNormalDistr(0.4411764706, 0.1), // 34/15 sec
 
 		//TransactionIntervalDistr: NewNormalDistr(0.04, 0.01), // 380/15 sec
 
@@ -50,6 +52,17 @@ var SimConfig = config{
 	},
 }
 
+func calcTxArrival() float64 {
+	txGasCost := uint64(21000)
+
+
+	p := float64(ChainConfig.Clique.Period)
+	gas := EthConfig.MinerConfig.GasCeil - 84000//83000 //84000
+
+	bNum := gas / txGasCost
+
+	return p / float64(bNum)
+}
 
 var MetricConfig  = metricConfig {
 
@@ -132,8 +145,8 @@ var defaultTxPoolConfig = &txPoolConfig {
 
 
 var	testMinerConfig = &minerConfig {
-	GasFloor: 800000,
-	GasCeil:  800000,
+	GasFloor: 714000,
+	GasCeil:  714000,
 	GasPrice: big.NewInt(params.Wei),
 	Recommit: 3 * time.Second,
 }
@@ -148,7 +161,7 @@ var	defaultMinerConfig = &minerConfig {
 
 var LogConfig = logConfig {
 
-	Logging: true,
+	Logging: false,
 
 	LogMessages: false,
 

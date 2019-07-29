@@ -177,7 +177,9 @@ func New(node INode,  metricCollector IMetricCollector) (*Ethereum, error) {
 	eth.Server.Protocols = eth.Protocols()
 
 	eth.miner = miner.New(node.Name() ,eth, &config.Miner, chainConfig, eth.EventFeed(), eth.engine, eth.isLocalBlock)
-	eth.StartMining()
+
+
+	//eth.StartMining()
 
 	return eth, nil
 }

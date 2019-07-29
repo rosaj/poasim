@@ -928,6 +928,8 @@ func (w *worker)  commit(uncles []*types.Header,  update bool, start uint64) err
 
 	if w.isRunning() && !(block.Transactions().Len() == 0 && 0 < w.eth.TxPool().PendingCount()) {
 
+		//Print(block.NumberU64(), block.Transactions().Len(), w.eth.TxPool().PendingCount())
+
 		t := &task{Runner: &godes.Runner{},worker: w, receipts: receipts, state: s, block: block, createdAt: SecondsNow()}
 		w.postTask(t)
 
